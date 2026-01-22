@@ -435,7 +435,7 @@ export default function Galeria() {
                                             ref={fileInputRef}
                                             type="file"
                                             name="image"
-                                            accept={ALLOWED_FORMATS.join(",")} 
+                                            accept={ALLOWED_FORMATS.join(",")}
                                             onChange={handleFileChange}
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                             aria-label="Seleccionar imagen para subir"

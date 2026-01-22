@@ -1,17 +1,17 @@
 // app/routes/carrusel.tsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { 
-  Images, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Images,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
   ExternalLink
 } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import type { Route } from "./+types/home";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Carrusel de Imágenes | Mi App" },
     { name: "description", content: "Galería de imágenes usando Lorem Picsum" },
@@ -33,15 +33,15 @@ export default function Carrusel() {
   const generateImages = () => {
     setIsLoading(true);
     setError(null);
-    
+
     // Generar 5 imágenes aleatorias de Lorem Picsum
     const newImages: ImageData[] = [];
     const usedIds = new Set<number>();
-    
+
     while (newImages.length < 5) {
       // Lorem Picsum tiene imágenes del 1 al 1084
       const randomId = Math.floor(Math.random() * 1000) + 1;
-      
+
       if (!usedIds.has(randomId)) {
         usedIds.add(randomId);
         newImages.push({
@@ -51,10 +51,10 @@ export default function Carrusel() {
         });
       }
     }
-    
+
     setImages(newImages);
     setCurrentIndex(0);
-    
+
     // Simular carga
     setTimeout(() => setIsLoading(false), 500);
   };
@@ -107,9 +107,9 @@ export default function Carrusel() {
                   </h1>
                   <p className="text-base-content/60 text-sm">
                     Imágenes de{" "}
-                    <a 
-                      href="https://picsum.photos" 
-                      target="_blank" 
+                    <a
+                      href="https://picsum.photos"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="link link-primary inline-flex items-center gap-1"
                     >
@@ -126,16 +126,16 @@ export default function Carrusel() {
                 className="btn btn-outline btn-primary gap-2"
                 aria-label="Cargar nuevas imágenes aleatorias"
               >
-                <RefreshCw 
-                  className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} 
-                  aria-hidden="true" 
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                  aria-hidden="true"
                 />
                 Nuevas imágenes
               </button>
             </div>
 
             {/* Carousel */}
-            <div 
+            <div
               className="relative w-full overflow-hidden rounded-xl"
               role="region"
               aria-roledescription="carrusel"
@@ -157,9 +157,8 @@ export default function Carrusel() {
                       {images.map((image, index) => (
                         <div
                           key={image.id}
-                          className={`carousel-item w-full transition-opacity duration-500 ${
-                            index === currentIndex ? "block" : "hidden"
-                          }`}
+                          className={`carousel-item w-full transition-opacity duration-500 ${index === currentIndex ? "block" : "hidden"
+                            }`}
                           role="group"
                           aria-roledescription="diapositiva"
                           aria-label={`${index + 1} de ${images.length}`}
@@ -172,7 +171,7 @@ export default function Carrusel() {
                             loading="lazy"
                             onError={(e) => {
                               // Fallback si la imagen falla
-                              (e.target as HTMLImageElement).src = 
+                              (e.target as HTMLImageElement).src =
                                 `https://picsum.photos/800/400?random=${image.id}`;
                             }}
                           />
@@ -200,7 +199,7 @@ export default function Carrusel() {
 
                     {/* Indicador de posición */}
                     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                      <div 
+                      <div
                         className="badge badge-neutral badge-lg gap-1"
                         aria-live="polite"
                         aria-atomic="true"
@@ -211,7 +210,7 @@ export default function Carrusel() {
                   </div>
 
                   {/* Thumbnails / Dots */}
-                  <div 
+                  <div
                     className="flex justify-center gap-2 py-4"
                     role="tablist"
                     aria-label="Seleccionar imagen"
@@ -223,35 +222,11 @@ export default function Carrusel() {
                         role="tab"
                         aria-selected={index === currentIndex}
                         aria-label={`Ir a imagen ${index + 1}`}
-                        className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                          index === currentIndex
+                        className={`w-3 h-3 rounded-full transition-all duration-300 ${index === currentIndex
                             ? "bg-primary w-8"
                             : "bg-base-300 hover:bg-primary/50"
-                        }`}
+                          }`}
                       />
-                    ))}
-                  </div>
-
-                  {/* Grid de miniaturas */}
-                  <div className="grid grid-cols-5 gap-2 mt-2">
-                    {images.map((image, index) => (
-                      <button
-                        key={`thumb-${image.id}`}
-                        onClick={() => goToSlide(index)}
-                        className={`relative rounded-lg overflow-hidden transition-all duration-300 ${
-                          index === currentIndex
-                            ? "ring-2 ring-primary ring-offset-2"
-                            : "opacity-60 hover:opacity-100"
-                        }`}
-                        aria-label={`Seleccionar imagen ${index + 1}`}
-                      >
-                        <img
-                          src={`https://picsum.photos/id/${image.id}/100/60`}
-                          alt=""
-                          className="w-full h-12 md:h-16 object-cover"
-                          loading="lazy"
-                        />
-                      </button>
                     ))}
                   </div>
                 </>
