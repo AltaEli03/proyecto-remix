@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
   Link,
 } from "react-router";
+import { AlertTriangle } from "lucide-react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -26,14 +27,14 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className="h-full">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="h-full">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -46,7 +47,7 @@ export default function App() {
   return <Outlet />;
 }
 
-// --- ERROR BOUNDARY PERSONALIZADO ---
+// --- ERROR BOUNDARY ACCESIBLE ---
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let statusCode = 500;
@@ -54,7 +55,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = "Algo salió mal al procesar tu solicitud.";
   let stack: string | undefined;
 
-  // Manejo de respuestas HTTP (404, 400, 500 lanzados manualmente)
   if (isRouteErrorResponse(error)) {
     statusCode = error.status;
 
@@ -80,7 +80,6 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         message = error.data?.message || message;
     }
   }
-  // Manejo de errores de código (JavaScript crash)
   else if (import.meta.env.DEV && error && error instanceof Error) {
     title = "Error de Aplicación";
     message = error.message;
@@ -88,51 +87,59 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    // Contenedor principal centrado con Tailwind
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-800 p-6">
-      <div className="max-w-md w-full text-center space-y-6">
+    <main className="hero min-h-screen bg-base-200" role="alert" aria-live="assertive">
+      <div className="hero-content text-center">
+        <div className="max-w-md space-y-6">
 
-        {/* Código de estado grande */}
-        <h1 className="text-9xl font-extrabold text-indigo-100 tracking-widest">
-          {statusCode}
-        </h1>
-
-        <div className="bg-white p-8 rounded-2xl shadow-xl relative -mt-12 mx-4">
-          {/* Título del error */}
-          <div className="bg-indigo-600 text-white rounded-full p-3 w-fit mx-auto mb-4 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {title}
-          </h2>
-
-          <p className="text-gray-600 mb-6">
-            {message}
-          </p>
-
-          {/* Botón para regresar al Index */}
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto"
+          <div
+            className="text-9xl font-extrabold text-primary/10 tracking-widest select-none"
+            aria-hidden="true"
           >
-            Volver al Inicio
-          </Link>
-        </div>
-
-        {/* Stack Trace (Solo visible en modo desarrollo para errores de JS) */}
-        {stack && (
-          <div className="mt-8 text-left w-full">
-            <details className="bg-red-50 border border-red-200 rounded-lg p-4 cursor-pointer">
-              <summary className="text-red-700 font-semibold text-sm">Ver detalles técnicos (Solo Dev)</summary>
-              <pre className="mt-2 w-full overflow-x-auto text-xs text-red-800 font-mono p-2">
-                <code>{stack}</code>
-              </pre>
-            </details>
+            {statusCode}
           </div>
-        )}
+
+          <div className="card bg-base-100 shadow-xl -mt-16 relative">
+            <div className="card-body items-center text-center pt-8">
+
+              <div className="avatar placeholder -mt-14">
+                <div className="bg-primary text-primary-content rounded-full w-14 h-14 shadow-lg flex items-center justify-center">
+                  <AlertTriangle className="w-8 h-8" aria-hidden="true" />
+                </div>
+              </div>
+
+              <h1 className="card-title text-2xl font-bold mt-2 text-base-content">
+                {title}
+              </h1>
+
+              <p className="text-base-content/70 mb-4 text-balance">
+                {message}
+              </p>
+
+              <div className="card-actions w-full">
+                <Link
+                  to="/"
+                  className="btn btn-primary w-full"
+                >
+                  Volver al Inicio
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {stack && (
+            <div className="collapse collapse-arrow bg-error/10 border border-error/20 rounded-box mt-4 text-left">
+              <input type="checkbox" aria-label="Ver detalles técnicos del error" />
+              <div className="collapse-title text-sm font-semibold text-error">
+                Ver detalles técnicos (Solo Dev)
+              </div>
+              <div className="collapse-content">
+                <pre className="text-xs text-error/80 font-mono overflow-x-auto p-2 whitespace-pre-wrap">
+                  <code>{stack}</code>
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
