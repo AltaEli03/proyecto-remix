@@ -9,7 +9,8 @@ import {
     MessageSquare,
     CheckCircle,
     AlertCircle,
-    Send
+    Send,
+    Calendar
 } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import type { Route } from "./+types/home";
@@ -26,15 +27,20 @@ const FIELD_LIMITS = {
     nombre: { min: 2, max: 50 },
     email: { min: 5, max: 100 },
     telefono: { min: 10, max: 10 },
-    edad: { min: 2, max: 3 },
     mensaje: { min: 10, max: 500 },
+} as const;
+
+// Constantes para edad
+const AGE_LIMITS = {
+    min: 18,
+    max: 120,
 } as const;
 
 interface FormData {
     nombre: string;
     email: string;
     telefono: string;
-    edad: string;
+    fechaNacimiento: string;
     mensaje: string;
 }
 
@@ -42,16 +48,54 @@ interface FormErrors {
     nombre?: string;
     email?: string;
     telefono?: string;
-    edad?: string;
+    fechaNacimiento?: string;
     mensaje?: string;
 }
+
+// Función para calcular la edad a partir de la fecha de nacimiento
+const calculateAge = (birthDate: string): number => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    
+    return age;
+};
+
+// Función para obtener la fecha máxima (hace 18 años)
+const getMaxDate = (): string => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - AGE_LIMITS.min);
+    return date.toISOString().split('T')[0];
+};
+
+// Función para obtener la fecha mínima (hace 120 años)
+const getMinDate = (): string => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - AGE_LIMITS.max);
+    return date.toISOString().split('T')[0];
+};
+
+// Función para formatear la fecha en español
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('es-MX', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+};
 
 export default function Formulario() {
     const [formData, setFormData] = useState<FormData>({
         nombre: "",
         email: "",
         telefono: "",
-        edad: "",
+        fechaNacimiento: "",
         mensaje: "",
     });
 
@@ -100,11 +144,24 @@ export default function Formulario() {
                 }
                 return "";
 
-            case "edad":
-                if (!value.trim()) return "La edad es obligatoria.";
-                const edad = parseInt(value);
-                if (isNaN(edad) || edad < 18 || edad > 120) {
-                    return "La edad debe ser un número entre 18 y 120.";
+            case "fechaNacimiento":
+                if (!value.trim()) return "La fecha de nacimiento es obligatoria.";
+                
+                const selectedDate = new Date(value);
+                const today = new Date();
+                
+                // Verificar que la fecha no sea futura
+                if (selectedDate > today) {
+                    return "La fecha de nacimiento no puede ser en el futuro.";
+                }
+                
+                const age = calculateAge(value);
+                
+                if (age < AGE_LIMITS.min) {
+                    return `Debes tener al menos ${AGE_LIMITS.min} años.`;
+                }
+                if (age > AGE_LIMITS.max) {
+                    return `La edad no puede ser mayor a ${AGE_LIMITS.max} años.`;
                 }
                 return "";
 
@@ -187,7 +244,7 @@ export default function Formulario() {
             nombre: "",
             email: "",
             telefono: "",
-            edad: "",
+            fechaNacimiento: "",
             mensaje: "",
         });
         setErrors({});
@@ -203,6 +260,9 @@ export default function Formulario() {
     };
 
     const hasErrors = Object.values(errors).some((error) => error);
+
+    // Calcular la edad actual si hay fecha seleccionada
+    const currentAge = formData.fechaNacimiento ? calculateAge(formData.fechaNacimiento) : null;
 
     if (isSubmitted) {
         return (
@@ -238,7 +298,12 @@ export default function Formulario() {
                                     <li><strong>Nombre:</strong> {formData.nombre}</li>
                                     <li><strong>Email:</strong> {formData.email}</li>
                                     <li><strong>Teléfono:</strong> {formData.telefono}</li>
-                                    <li><strong>Edad:</strong> {formData.edad} años</li>
+                                    <li>
+                                        <strong>Fecha de nacimiento:</strong> {formatDate(formData.fechaNacimiento)}
+                                        <span className="text-base-content/60 ml-1">
+                                            ({calculateAge(formData.fechaNacimiento)} años)
+                                        </span>
+                                    </li>
                                     <li><strong>Mensaje:</strong> {formData.mensaje}</li>
                                 </ul>
                             </div>
@@ -410,38 +475,42 @@ export default function Formulario() {
                                 )}
                             </div>
 
-                            {/* Edad */}
+                            {/* Fecha de Nacimiento */}
                             <div className="form-control">
-                                <label className="label" htmlFor="edad">
-                                    <span className="label-text font-medium">
-                                        Edad
-                                        <span className="text-error ml-1" aria-hidden="true">*</span>
+                                <label className="label" htmlFor="fechaNacimiento">
+                                    <span className="label-text font-medium flex items-center gap-2">
+                                        <Calendar className="w-4 h-4" aria-hidden="true" />
+                                        Fecha de nacimiento
+                                        <span className="text-error" aria-hidden="true">*</span>
                                     </span>
+                                    {currentAge !== null && currentAge >= AGE_LIMITS.min && currentAge <= AGE_LIMITS.max && (
+                                        <span className="label-text-alt text-success font-medium">
+                                            {currentAge} años
+                                        </span>
+                                    )}
                                 </label>
                                 <input
-                                    id="edad"
-                                    type="number"
-                                    name="edad"
-                                    value={formData.edad}
+                                    id="fechaNacimiento"
+                                    type="date"
+                                    name="fechaNacimiento"
+                                    value={formData.fechaNacimiento}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
-                                    min="18"
-                                    max="120"
-                                    maxLength={FIELD_LIMITS.edad.max}
-                                    className={`input input-bordered w-full ${errors.edad ? "input-error" : ""}`}
-                                    placeholder="25"
+                                    min={getMinDate()}
+                                    max={getMaxDate()}
+                                    className={`input input-bordered w-full ${errors.fechaNacimiento ? "input-error" : ""}`}
                                     aria-required="true"
-                                    aria-invalid={!!errors.edad}
-                                    aria-describedby={errors.edad ? "edad-error" : "edad-hint"}
+                                    aria-invalid={!!errors.fechaNacimiento}
+                                    aria-describedby={errors.fechaNacimiento ? "fechaNacimiento-error" : "fechaNacimiento-hint"}
                                 />
-                                {errors.edad ? (
-                                    <label className="label" id="edad-error">
-                                        <span className="label-text-alt text-error">{errors.edad}</span>
+                                {errors.fechaNacimiento ? (
+                                    <label className="label" id="fechaNacimiento-error">
+                                        <span className="label-text-alt text-error">{errors.fechaNacimiento}</span>
                                     </label>
                                 ) : (
-                                    <label className="label" id="edad-hint">
+                                    <label className="label" id="fechaNacimiento-hint">
                                         <span className="label-text-alt text-base-content/50">
-                                            Entre 18 y 120 años
+                                            Debes tener entre {AGE_LIMITS.min} y {AGE_LIMITS.max} años
                                         </span>
                                     </label>
                                 )}
