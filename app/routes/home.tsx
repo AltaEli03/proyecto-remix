@@ -3,16 +3,16 @@ import { type ActionFunctionArgs, data } from "react-router";
 import { Form, useActionData, useNavigation, Link } from "react-router";
 import { useRef, useState, useEffect } from "react";
 import {
-  AlertCircle,
-  CheckCircle,
   Calculator,
   FileText,
   Images,
   AlertTriangle,
-  Rocket
+  Rocket,
+  CameraIcon
 } from "lucide-react";
-import pool from "~/db.server";
+import pool from "~/utils/db.server";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { Alert } from "~/components/Alert";
 import type { Route } from "./+types/home";
 
 import ReCAPTCHA_ from "react-google-recaptcha";
@@ -128,6 +128,13 @@ export default function Index() {
       description: "Página de bienvenida",
       color: "btn-info",
     },
+    {
+      to: "/galeria",
+      icon: CameraIcon,
+      label: "Galería Cloudinary",
+      description: "Subida de imágenes real",
+      color: "btn-warning",
+    },
   ];
 
   return (
@@ -151,28 +158,22 @@ export default function Index() {
 
               {/* Mensajes de Feedback */}
               {actionData?.error && (
-                <div
-                  ref={errorRef}
-                  role="alert"
-                  tabIndex={-1}
-                  className="alert alert-error mt-2 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                  id="form-feedback"
-                >
-                  <AlertCircle className="h-6 w-6 shrink-0" aria-hidden="true" />
-                  <span>{actionData.error}</span>
-                </div>
+                <Alert
+                  type="error"
+                  message={actionData?.error}
+                  dismissible={true}
+                  className="mt-2"
+                />
               )}
 
               {actionData?.success && (
-                <div
-                  ref={successRef}
-                  role="alert"
-                  tabIndex={-1}
-                  className="alert alert-success mt-2 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-                >
-                  <CheckCircle className="h-6 w-6 shrink-0" aria-hidden="true" />
-                  <span>{actionData.message}</span>
-                </div>
+                <Alert
+                  type="success"
+                  message={actionData?.message}
+                  dismissible={true}
+                  autoClose={5000} // Se cierra automáticamente en 5 segundos
+                  className="mt-2"
+                />
               )}
 
               <Form method="post" className="space-y-6 mt-4" noValidate>

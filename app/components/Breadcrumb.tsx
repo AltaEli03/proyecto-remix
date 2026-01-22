@@ -16,6 +16,7 @@ const routeNames: Record<string, string> = {
   "": "Inicio",
   "calculadora": "Calculadora",
   "formulario": "Formulario",
+  "galeria": "Galería",  
   "carrusel": "Carrusel",
 };
 

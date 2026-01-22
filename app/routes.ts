@@ -7,4 +7,5 @@ export default [
   route("formulario", "routes/formulario.tsx"),
   route("carrusel", "routes/carrusel.tsx"),
   route("trigger-error", "routes/trigger-error.tsx"),
+  route("galeria", "routes/galeria.tsx"),
 ] satisfies RouteConfig;

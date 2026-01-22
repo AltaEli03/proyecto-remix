@@ -58,11 +58,11 @@ const calculateAge = (birthDate: string): number => {
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
         age--;
     }
-    
+
     return age;
 };
 
@@ -146,17 +146,17 @@ export default function Formulario() {
 
             case "fechaNacimiento":
                 if (!value.trim()) return "La fecha de nacimiento es obligatoria.";
-                
+
                 const selectedDate = new Date(value);
                 const today = new Date();
-                
+
                 // Verificar que la fecha no sea futura
                 if (selectedDate > today) {
                     return "La fecha de nacimiento no puede ser en el futuro.";
                 }
-                
+
                 const age = calculateAge(value);
-                
+
                 if (age < AGE_LIMITS.min) {
                     return `Debes tener al menos ${AGE_LIMITS.min} años.`;
                 }
@@ -556,10 +556,10 @@ export default function Formulario() {
                                 {/* Barra de progreso visual para el mensaje */}
                                 <progress
                                     className={`progress w-full h-1 ${formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.9
-                                            ? "progress-error"
-                                            : formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.7
-                                                ? "progress-warning"
-                                                : "progress-primary"
+                                        ? "progress-error"
+                                        : formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.7
+                                            ? "progress-warning"
+                                            : "progress-primary"
                                         }`}
                                     value={formData.mensaje.length}
                                     max={FIELD_LIMITS.mensaje.max}
