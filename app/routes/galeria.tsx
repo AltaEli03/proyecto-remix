@@ -6,7 +6,6 @@ import {
     Upload,
     Image as ImageIcon,
     AlertCircle,
-    CheckCircle,
     Trash2,
     X,
     ZoomIn,
@@ -104,9 +103,13 @@ export async function action({ request }: ActionFunctionArgs) {
         );
     }
 
-    if (!file.type.startsWith("image/")) {
+    if (!ALLOWED_FORMATS.includes(file.type)) {
         return data(
-            { success: false, error: "El archivo debe ser una imagen", message: null },
+            {
+                success: false,
+                error: `Formato no válido. Permitidos: ${ALLOWED_FORMATS.map(t => t.split('/')[1]).join(', ')}`,
+                message: null
+            },
             { status: 400 }
         );
     }
@@ -156,6 +159,9 @@ export default function Galeria() {
     // NUEVO: Estado para errores del cliente (validación inmediata)
     const [clientError, setClientError] = useState<string | null>(null);
 
+    // NUEVO: Estado para controlar qué imagen tiene el menú activo en móvil
+    const [activeImageMenu, setActiveImageMenu] = useState<string | null>(null);
+
     const isSubmitting = navigation.state === "submitting";
     const isLoading = navigation.state === "loading" || revalidator.state === "loading";
     const isDeleting = isSubmitting && navigation.formData?.get("intent") === "delete";
@@ -175,14 +181,26 @@ export default function Galeria() {
         }
     }, [actionData]);
 
+    // Cerrar menú activo al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setActiveImageMenu(null);
+        };
+
+        if (activeImageMenu) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [activeImageMenu]);
+
     // NUEVO: Función centralizada de validación
     const validateAndSetFile = useCallback((file: File) => {
         setClientError(null); // Limpiar errores previos
 
         // 1. Validar Tipo
-        if (!file.type.startsWith("image/")) {
-            setClientError("El archivo seleccionado no es una imagen válida.");
-            // Limpiar selección previa si había
+        if (!ALLOWED_FORMATS.includes(file.type)) {
+            setClientError(`Formato de archivo no válido. Solo se permiten: JPG, PNG, GIF, WEBP.`);
+
             setSelectedFile(null);
             setPreview(null);
             if (fileInputRef.current) {
@@ -266,6 +284,7 @@ export default function Galeria() {
     // Abrir modal de confirmación de eliminación
     const openDeleteConfirmation = (publicId: string, imageUrl?: string) => {
         setDeleteConfirmation({ publicId, imageUrl });
+        setActiveImageMenu(null); // Cerrar menú al abrir confirmación
     };
 
     // Cerrar modal de confirmación
@@ -315,7 +334,7 @@ export default function Galeria() {
                                         type="error"
                                         message={clientError || actionData?.error}
                                         dismissible={true}
-                                        onClose ={() => setClientError(null)}
+                                        onClose={() => setClientError(null)}
                                         className="mt-2"
                                     />
                                 )}
@@ -416,7 +435,7 @@ export default function Galeria() {
                                             ref={fileInputRef}
                                             type="file"
                                             name="image"
-                                            accept="image/*"
+                                            accept={ALLOWED_FORMATS.join(",")} 
                                             onChange={handleFileChange}
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                             aria-label="Seleccionar imagen para subir"
@@ -509,7 +528,7 @@ export default function Galeria() {
                                 ) : (
                                     /* Grid de imágenes */
                                     <div
-                                        className="grid grid-cols-2 md:grid-cols-3 gap-4"
+                                        className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
                                         role="list"
                                         aria-label="Galería de imágenes"
                                     >
@@ -517,7 +536,7 @@ export default function Galeria() {
                                             <div
                                                 key={image.public_id}
                                                 role="listitem"
-                                                className="group relative aspect-square rounded-xl overflow-hidden bg-base-200 shadow-sm hover:shadow-lg transition-shadow"
+                                                className="group relative aspect-square rounded-xl overflow-hidden bg-base-200 shadow-sm hover:shadow-lg transition-all duration-300"
                                             >
                                                 <img
                                                     src={image.secure_url}
@@ -526,8 +545,52 @@ export default function Galeria() {
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 />
 
-                                                {/* Overlay con acciones */}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                {/* ===== OVERLAY MÓVIL - Siempre visible ===== */}
+                                                <div className="absolute inset-0 md:hidden">
+                                                    {/* Gradiente inferior sutil */}
+                                                    <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
+
+                                                    {/* Botones siempre visibles en móvil */}
+                                                    <div className="absolute bottom-0 left-0 right-0 p-2">
+                                                        <div className="flex justify-center gap-1.5">
+                                                            {/* Ver en grande */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setModalImage({
+                                                                    url: image.secure_url,
+                                                                    publicId: image.public_id
+                                                                })}
+                                                                className="btn btn-circle btn-sm bg-white/20 backdrop-blur-sm border-0 text-white hover:bg-white/40 shadow-lg"
+                                                                aria-label="Ver imagen en grande"
+                                                            >
+                                                                <ZoomIn className="w-5 h-5" />
+                                                            </button>
+
+                                                            {/* Descargar */}
+                                                            <a
+                                                                href={`${image.secure_url}?download=${image.public_id.split('/').pop() || 'imagen'}.${image.format}`}
+                                                                download
+                                                                className="btn btn-circle btn-sm bg-white/20 backdrop-blur-sm border-0 text-white hover:bg-white/40 shadow-lg"
+                                                                aria-label="Descargar imagen"
+                                                            >
+                                                                <Download className="w-5 h-5" />
+                                                            </a>
+
+                                                            {/* Eliminar */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openDeleteConfirmation(image.public_id, image.secure_url)}
+                                                                className="btn btn-circle btn-sm bg-red-600/90 backdrop-blur-sm border-0 text-white hover:bg-red-700 shadow-lg"
+                                                                aria-label="Eliminar imagen"
+                                                            >
+                                                                <Trash2 className="w-5 h-5" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* ===== OVERLAY DESKTOP - Solo en hover ===== */}
+                                                <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                                     <div className="absolute bottom-0 left-0 right-0 p-3">
                                                         <div className="flex justify-center gap-2">
                                                             {/* Ver en grande */}
@@ -537,7 +600,7 @@ export default function Galeria() {
                                                                     url: image.secure_url,
                                                                     publicId: image.public_id
                                                                 })}
-                                                                className="btn btn-circle btn-sm bg-white/20 border-0 text-white hover:bg-white/40"
+                                                                className="btn btn-circle btn-sm bg-white/20 border-0 text-white hover:bg-white/40 backdrop-blur-sm"
                                                                 aria-label="Ver imagen en grande"
                                                             >
                                                                 <ZoomIn className="w-4 h-4" />
@@ -549,17 +612,17 @@ export default function Galeria() {
                                                                 download
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="btn btn-circle btn-sm bg-white/20 border-0 text-white hover:bg-white/40"
+                                                                className="btn btn-circle btn-sm bg-white/20 border-0 text-white hover:bg-white/40 backdrop-blur-sm"
                                                                 aria-label="Descargar imagen"
                                                             >
                                                                 <Download className="w-4 h-4" />
                                                             </a>
 
-                                                            {/* Eliminar - Ahora abre el modal */}
+                                                            {/* Eliminar */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => openDeleteConfirmation(image.public_id, image.secure_url)}
-                                                                className="btn btn-circle btn-sm bg-error/80 border-0 text-white hover:bg-error"
+                                                                className="btn btn-circle btn-sm bg-error/80 border-0 text-white hover:bg-error backdrop-blur-sm"
                                                                 aria-label="Eliminar imagen"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
@@ -570,7 +633,7 @@ export default function Galeria() {
 
                                                 {/* Indicador de carga al eliminar */}
                                                 {navigation.formData?.get("publicId") === image.public_id && (
-                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                         <span className="loading loading-spinner loading-lg text-white"></span>
                                                     </div>
                                                 )}
