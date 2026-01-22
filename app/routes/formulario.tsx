@@ -21,6 +21,15 @@ export function meta({ }: Route.MetaArgs) {
     ];
 }
 
+// Constantes para límites de longitud
+const FIELD_LIMITS = {
+    nombre: { min: 2, max: 50 },
+    email: { min: 5, max: 100 },
+    telefono: { min: 10, max: 10 },
+    edad: { min: 2, max: 3 },
+    mensaje: { min: 10, max: 500 },
+} as const;
+
 interface FormData {
     nombre: string;
     email: string;
@@ -53,7 +62,6 @@ export default function Formulario() {
     const successRef = useRef<HTMLDivElement>(null);
     const errorRef = useRef<HTMLDivElement>(null);
 
-    // Focus management para accesibilidad
     useEffect(() => {
         if (isSubmitted && successRef.current) {
             successRef.current.focus();
@@ -64,7 +72,12 @@ export default function Formulario() {
         switch (name) {
             case "nombre":
                 if (!value.trim()) return "El nombre es obligatorio.";
-                if (value.trim().length < 2) return "El nombre debe tener al menos 2 caracteres.";
+                if (value.trim().length < FIELD_LIMITS.nombre.min) {
+                    return `El nombre debe tener al menos ${FIELD_LIMITS.nombre.min} caracteres.`;
+                }
+                if (value.trim().length > FIELD_LIMITS.nombre.max) {
+                    return `El nombre no puede exceder ${FIELD_LIMITS.nombre.max} caracteres.`;
+                }
                 if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(value)) {
                     return "El nombre solo puede contener letras.";
                 }
@@ -72,6 +85,9 @@ export default function Formulario() {
 
             case "email":
                 if (!value.trim()) return "El email es obligatorio.";
+                if (value.length > FIELD_LIMITS.email.max) {
+                    return `El email no puede exceder ${FIELD_LIMITS.email.max} caracteres.`;
+                }
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
                     return "Ingresa un email válido.";
                 }
@@ -80,7 +96,7 @@ export default function Formulario() {
             case "telefono":
                 if (!value.trim()) return "El teléfono es obligatorio.";
                 if (!/^\d{10}$/.test(value.replace(/\s/g, ""))) {
-                    return "El teléfono debe tener 10 dígitos.";
+                    return "El teléfono debe tener exactamente 10 dígitos.";
                 }
                 return "";
 
@@ -94,11 +110,11 @@ export default function Formulario() {
 
             case "mensaje":
                 if (!value.trim()) return "El mensaje es obligatorio.";
-                if (value.trim().length < 10) {
-                    return "El mensaje debe tener al menos 10 caracteres.";
+                if (value.trim().length < FIELD_LIMITS.mensaje.min) {
+                    return `El mensaje debe tener al menos ${FIELD_LIMITS.mensaje.min} caracteres.`;
                 }
-                if (value.length > 500) {
-                    return "El mensaje no puede exceder 500 caracteres.";
+                if (value.length > FIELD_LIMITS.mensaje.max) {
+                    return `El mensaje no puede exceder ${FIELD_LIMITS.mensaje.max} caracteres.`;
                 }
                 return "";
 
@@ -111,9 +127,15 @@ export default function Formulario() {
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
 
-        // Validación en tiempo real (on change)
+        // Para teléfono, solo permitir dígitos
+        if (name === "telefono") {
+            const numericValue = value.replace(/\D/g, "");
+            setFormData((prev) => ({ ...prev, [name]: numericValue }));
+        } else {
+            setFormData((prev) => ({ ...prev, [name]: value }));
+        }
+
         if (errors[name as keyof FormErrors]) {
             const error = validateField(name as keyof FormData, value);
             setErrors((prev) => ({ ...prev, [name]: error }));
@@ -148,7 +170,6 @@ export default function Formulario() {
         e.preventDefault();
 
         if (!validateForm()) {
-            // Enfocar primer error
             const firstErrorField = Object.keys(errors)[0];
             const element = document.getElementById(firstErrorField);
             element?.focus();
@@ -156,10 +177,7 @@ export default function Formulario() {
         }
 
         setIsSubmitting(true);
-
-        // Simular envío (no conectado a BD)
         await new Promise((resolve) => setTimeout(resolve, 1500));
-
         setIsSubmitting(false);
         setIsSubmitted(true);
     };
@@ -174,6 +192,14 @@ export default function Formulario() {
         });
         setErrors({});
         setIsSubmitted(false);
+    };
+
+    // Helper para calcular el porcentaje de uso
+    const getCharacterProgress = (current: number, max: number) => {
+        const percentage = (current / max) * 100;
+        if (percentage >= 90) return "text-error";
+        if (percentage >= 70) return "text-warning";
+        return "text-base-content/50";
     };
 
     const hasErrors = Object.values(errors).some((error) => error);
@@ -203,7 +229,7 @@ export default function Formulario() {
                             </h1>
 
                             <p className="text-base-content/70 mb-4">
-                                Todos los campos fueron validados correctamente. (No se guardó en BD)
+                                Todos los campos fueron validados correctamente.
                             </p>
 
                             <div className="bg-base-200 rounded-lg p-4 w-full text-left">
@@ -218,10 +244,7 @@ export default function Formulario() {
                             </div>
 
                             <div className="card-actions mt-4 w-full">
-                                <button
-                                    onClick={handleReset}
-                                    className="btn btn-primary w-full"
-                                >
+                                <button onClick={handleReset} className="btn btn-primary w-full">
                                     Enviar otro formulario
                                 </button>
                                 <Link to="/" className="btn btn-ghost w-full">
@@ -261,11 +284,7 @@ export default function Formulario() {
 
                         {/* Error Summary */}
                         {hasErrors && (
-                            <div
-                                ref={errorRef}
-                                role="alert"
-                                className="alert alert-warning mb-4"
-                            >
+                            <div ref={errorRef} role="alert" className="alert alert-warning mb-4">
                                 <AlertCircle className="w-5 h-5" aria-hidden="true" />
                                 <span>Por favor, corrige los errores marcados.</span>
                             </div>
@@ -280,6 +299,9 @@ export default function Formulario() {
                                         Nombre completo
                                         <span className="text-error" aria-hidden="true">*</span>
                                     </span>
+                                    <span className={`label-text-alt ${getCharacterProgress(formData.nombre.length, FIELD_LIMITS.nombre.max)}`}>
+                                        {formData.nombre.length}/{FIELD_LIMITS.nombre.max}
+                                    </span>
                                 </label>
                                 <input
                                     id="nombre"
@@ -288,17 +310,21 @@ export default function Formulario() {
                                     value={formData.nombre}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
-                                    className={`input input-bordered w-full ${errors.nombre ? "input-error" : ""
-                                        }`}
+                                    maxLength={FIELD_LIMITS.nombre.max}
+                                    className={`input input-bordered w-full ${errors.nombre ? "input-error" : ""}`}
                                     placeholder="Juan Pérez"
                                     aria-required="true"
                                     aria-invalid={!!errors.nombre}
-                                    aria-describedby={errors.nombre ? "nombre-error" : undefined}
+                                    aria-describedby={errors.nombre ? "nombre-error" : "nombre-hint"}
                                 />
-                                {errors.nombre && (
+                                {errors.nombre ? (
                                     <label className="label" id="nombre-error">
-                                        <span className="label-text-alt text-error">
-                                            {errors.nombre}
+                                        <span className="label-text-alt text-error">{errors.nombre}</span>
+                                    </label>
+                                ) : (
+                                    <label className="label" id="nombre-hint">
+                                        <span className="label-text-alt text-base-content/50">
+                                            Entre {FIELD_LIMITS.nombre.min} y {FIELD_LIMITS.nombre.max} caracteres
                                         </span>
                                     </label>
                                 )}
@@ -312,6 +338,9 @@ export default function Formulario() {
                                         Correo electrónico
                                         <span className="text-error" aria-hidden="true">*</span>
                                     </span>
+                                    <span className={`label-text-alt ${getCharacterProgress(formData.email.length, FIELD_LIMITS.email.max)}`}>
+                                        {formData.email.length}/{FIELD_LIMITS.email.max}
+                                    </span>
                                 </label>
                                 <input
                                     id="email"
@@ -320,17 +349,21 @@ export default function Formulario() {
                                     value={formData.email}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
-                                    className={`input input-bordered w-full ${errors.email ? "input-error" : ""
-                                        }`}
+                                    maxLength={FIELD_LIMITS.email.max}
+                                    className={`input input-bordered w-full ${errors.email ? "input-error" : ""}`}
                                     placeholder="juan@ejemplo.com"
                                     aria-required="true"
                                     aria-invalid={!!errors.email}
-                                    aria-describedby={errors.email ? "email-error" : undefined}
+                                    aria-describedby={errors.email ? "email-error" : "email-hint"}
                                 />
-                                {errors.email && (
+                                {errors.email ? (
                                     <label className="label" id="email-error">
-                                        <span className="label-text-alt text-error">
-                                            {errors.email}
+                                        <span className="label-text-alt text-error">{errors.email}</span>
+                                    </label>
+                                ) : (
+                                    <label className="label" id="email-hint">
+                                        <span className="label-text-alt text-base-content/50">
+                                            Máximo {FIELD_LIMITS.email.max} caracteres
                                         </span>
                                     </label>
                                 )}
@@ -341,8 +374,11 @@ export default function Formulario() {
                                 <label className="label" htmlFor="telefono">
                                     <span className="label-text font-medium flex items-center gap-2">
                                         <Phone className="w-4 h-4" aria-hidden="true" />
-                                        Teléfono (10 dígitos)
+                                        Teléfono
                                         <span className="text-error" aria-hidden="true">*</span>
+                                    </span>
+                                    <span className={`label-text-alt ${getCharacterProgress(formData.telefono.length, FIELD_LIMITS.telefono.max)}`}>
+                                        {formData.telefono.length}/{FIELD_LIMITS.telefono.max}
                                     </span>
                                 </label>
                                 <input
@@ -352,18 +388,23 @@ export default function Formulario() {
                                     value={formData.telefono}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
-                                    className={`input input-bordered w-full ${errors.telefono ? "input-error" : ""
-                                        }`}
+                                    maxLength={FIELD_LIMITS.telefono.max}
+                                    className={`input input-bordered w-full ${errors.telefono ? "input-error" : ""}`}
                                     placeholder="5512345678"
                                     inputMode="numeric"
+                                    pattern="[0-9]*"
                                     aria-required="true"
                                     aria-invalid={!!errors.telefono}
-                                    aria-describedby={errors.telefono ? "telefono-error" : undefined}
+                                    aria-describedby={errors.telefono ? "telefono-error" : "telefono-hint"}
                                 />
-                                {errors.telefono && (
+                                {errors.telefono ? (
                                     <label className="label" id="telefono-error">
-                                        <span className="label-text-alt text-error">
-                                            {errors.telefono}
+                                        <span className="label-text-alt text-error">{errors.telefono}</span>
+                                    </label>
+                                ) : (
+                                    <label className="label" id="telefono-hint">
+                                        <span className="label-text-alt text-base-content/50">
+                                            Exactamente 10 dígitos
                                         </span>
                                     </label>
                                 )}
@@ -386,17 +427,21 @@ export default function Formulario() {
                                     onBlur={handleBlur}
                                     min="18"
                                     max="120"
-                                    className={`input input-bordered w-full ${errors.edad ? "input-error" : ""
-                                        }`}
+                                    maxLength={FIELD_LIMITS.edad.max}
+                                    className={`input input-bordered w-full ${errors.edad ? "input-error" : ""}`}
                                     placeholder="25"
                                     aria-required="true"
                                     aria-invalid={!!errors.edad}
-                                    aria-describedby={errors.edad ? "edad-error" : undefined}
+                                    aria-describedby={errors.edad ? "edad-error" : "edad-hint"}
                                 />
-                                {errors.edad && (
+                                {errors.edad ? (
                                     <label className="label" id="edad-error">
-                                        <span className="label-text-alt text-error">
-                                            {errors.edad}
+                                        <span className="label-text-alt text-error">{errors.edad}</span>
+                                    </label>
+                                ) : (
+                                    <label className="label" id="edad-hint">
+                                        <span className="label-text-alt text-base-content/50">
+                                            Entre 18 y 120 años
                                         </span>
                                     </label>
                                 )}
@@ -410,6 +455,9 @@ export default function Formulario() {
                                         Mensaje
                                         <span className="text-error" aria-hidden="true">*</span>
                                     </span>
+                                    <span className={`label-text-alt ${getCharacterProgress(formData.mensaje.length, FIELD_LIMITS.mensaje.max)}`}>
+                                        {formData.mensaje.length}/{FIELD_LIMITS.mensaje.max}
+                                    </span>
                                 </label>
                                 <textarea
                                     id="mensaje"
@@ -417,24 +465,37 @@ export default function Formulario() {
                                     value={formData.mensaje}
                                     onChange={handleChange}
                                     onBlur={handleBlur}
-                                    className={`textarea textarea-bordered w-full h-24 ${errors.mensaje ? "textarea-error" : ""
-                                        }`}
-                                    placeholder="Escribe tu mensaje aquí (mínimo 10 caracteres)..."
+                                    maxLength={FIELD_LIMITS.mensaje.max}
+                                    className={`textarea textarea-bordered w-full h-24 ${errors.mensaje ? "textarea-error" : ""}`}
+                                    placeholder="Escribe tu mensaje aquí..."
                                     aria-required="true"
                                     aria-invalid={!!errors.mensaje}
                                     aria-describedby={errors.mensaje ? "mensaje-error" : "mensaje-hint"}
                                 />
-                                <label className="label">
-                                    {errors.mensaje ? (
-                                        <span id="mensaje-error" className="label-text-alt text-error">
-                                            {errors.mensaje}
+                                {errors.mensaje ? (
+                                    <label className="label" id="mensaje-error">
+                                        <span className="label-text-alt text-error">{errors.mensaje}</span>
+                                    </label>
+                                ) : (
+                                    <label className="label" id="mensaje-hint">
+                                        <span className="label-text-alt text-base-content/50">
+                                            Entre {FIELD_LIMITS.mensaje.min} y {FIELD_LIMITS.mensaje.max} caracteres
                                         </span>
-                                    ) : (
-                                        <span id="mensaje-hint" className="label-text-alt">
-                                            {formData.mensaje.length}/500 caracteres
-                                        </span>
-                                    )}
-                                </label>
+                                    </label>
+                                )}
+
+                                {/* Barra de progreso visual para el mensaje */}
+                                <progress
+                                    className={`progress w-full h-1 ${formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.9
+                                            ? "progress-error"
+                                            : formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.7
+                                                ? "progress-warning"
+                                                : "progress-primary"
+                                        }`}
+                                    value={formData.mensaje.length}
+                                    max={FIELD_LIMITS.mensaje.max}
+                                    aria-hidden="true"
+                                />
                             </div>
 
                             {/* Submit Button */}
