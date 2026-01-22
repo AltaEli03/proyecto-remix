@@ -23,6 +23,11 @@ import {
 } from "~/utils/cloudinary.server";
 import type { Route } from "./+types/galeria";
 
+// --- CONSTANTES ---
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ALLOWED_FORMATS = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
 // Tipos para las imágenes de Cloudinary
 interface CloudinaryImage {
     public_id: string;
@@ -106,11 +111,10 @@ export async function action({ request }: ActionFunctionArgs) {
         );
     }
 
-    // Límite de 10MB
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
+    // Validación de respaldo en el servidor (Seguridad)
+    if (file.size > MAX_FILE_SIZE_BYTES) {
         return data(
-            { success: false, error: "La imagen no debe superar los 10MB", message: null },
+            { success: false, error: `La imagen supera el límite de ${MAX_FILE_SIZE_MB}MB`, message: null },
             { status: 400 }
         );
     }
@@ -149,6 +153,9 @@ export default function Galeria() {
     // Estado para el modal de confirmación de eliminación
     const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
 
+    // NUEVO: Estado para errores del cliente (validación inmediata)
+    const [clientError, setClientError] = useState<string | null>(null);
+
     const isSubmitting = navigation.state === "submitting";
     const isLoading = navigation.state === "loading" || revalidator.state === "loading";
     const isDeleting = isSubmitting && navigation.formData?.get("intent") === "delete";
@@ -156,11 +163,7 @@ export default function Galeria() {
     // Limpiar preview después de subida exitosa
     useEffect(() => {
         if (actionData?.success && actionData?.message?.includes("subida")) {
-            setPreview(null);
-            setSelectedFile(null);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
+            clearPreview();
         }
     }, [actionData]);
 
@@ -172,16 +175,50 @@ export default function Galeria() {
         }
     }, [actionData]);
 
-    // Manejar cambio de archivo
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith("image/")) {
+    // NUEVO: Función centralizada de validación
+    const validateAndSetFile = useCallback((file: File) => {
+        setClientError(null); // Limpiar errores previos
+
+        // 1. Validar Tipo
+        if (!file.type.startsWith("image/")) {
+            setClientError("El archivo seleccionado no es una imagen válida.");
+            // Limpiar selección previa si había
+            setSelectedFile(null);
+            setPreview(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+            return false;
+        }
+
+        // 2. Validar Tamaño
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            setClientError(`La imagen es demasiado grande. Máximo permitido: ${MAX_FILE_SIZE_MB} MB.`);
+            // Aún así mostramos la preview para que el usuario vea qué archivo seleccionó
             setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setPreview(reader.result as string);
             };
             reader.readAsDataURL(file);
+            return false;
+        }
+
+        // Si pasa todas las validaciones
+        setSelectedFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        return true;
+    }, []);
+
+    // Manejar cambio de archivo (Input)
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            validateAndSetFile(file);
         }
     };
 
@@ -202,27 +239,25 @@ export default function Galeria() {
         setDragActive(false);
 
         const file = e.dataTransfer.files?.[0];
-        if (file && file.type.startsWith("image/")) {
-            setSelectedFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+        if (file) {
+            const isValid = validateAndSetFile(file);
 
-            // Actualizar el input file
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            if (fileInputRef.current) {
-                fileInputRef.current.files = dataTransfer.files;
+            // Solo sincronizar input file si es válido
+            if (isValid) {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                if (fileInputRef.current) {
+                    fileInputRef.current.files = dataTransfer.files;
+                }
             }
         }
-    }, []);
+    }, [validateAndSetFile]);
 
     // Limpiar selección
     const clearPreview = () => {
         setPreview(null);
         setSelectedFile(null);
+        setClientError(null); // Limpiar error al cancelar
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -252,6 +287,9 @@ export default function Galeria() {
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     };
 
+    // Verificar si el archivo excede el tamaño
+    const isFileTooLarge = selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES;
+
     return (
         <main className="min-h-screen bg-base-200 p-4">
             <div className="container mx-auto max-w-6xl">
@@ -268,20 +306,22 @@ export default function Galeria() {
                                 </h1>
 
                                 <p className="text-base-content/70 text-sm">
-                                    Arrastra o selecciona una imagen para subirla a la nube.
+                                    Arrastra o selecciona una imagen (Máx {MAX_FILE_SIZE_MB}MB).
                                 </p>
 
-                                {/* Mensajes de Feedback */}
-                                {actionData?.error && (
+                                {/* Mensajes de Error (Cliente o Servidor) */}
+                                {(clientError || actionData?.error) && (
                                     <Alert
                                         type="error"
-                                        message={actionData?.error}
+                                        message={clientError || actionData?.error}
                                         dismissible={true}
+                                        onClose ={() => setClientError(null)}
                                         className="mt-2"
                                     />
                                 )}
 
-                                {actionData?.success && (
+                                {/* Mensaje de Éxito */}
+                                {actionData?.success && !clientError && (
                                     <Alert
                                         type="success"
                                         message={actionData?.message}
@@ -303,14 +343,22 @@ export default function Galeria() {
                                             transition-all duration-200 cursor-pointer
                                             ${dragActive
                                                 ? "border-primary bg-primary/10 scale-[1.02]"
-                                                : "border-base-300 hover:border-primary/50 hover:bg-base-200/50"
+                                                : clientError || isFileTooLarge
+                                                    ? "border-error bg-error/5"
+                                                    : "border-base-300 hover:border-primary/50 hover:bg-base-200/50"
                                             }
                                         `}
                                     >
                                         {!preview ? (
                                             <div className="space-y-3">
-                                                <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <ImageIcon className="w-7 h-7 text-primary" aria-hidden="true" />
+                                                <div className={`mx-auto w-14 h-14 rounded-full flex items-center justify-center
+                                                    ${clientError ? "bg-error/10" : "bg-primary/10"}`}
+                                                >
+                                                    {clientError ? (
+                                                        <AlertCircle className="w-7 h-7 text-error" aria-hidden="true" />
+                                                    ) : (
+                                                        <ImageIcon className="w-7 h-7 text-primary" aria-hidden="true" />
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-base-content">
@@ -321,7 +369,7 @@ export default function Galeria() {
                                                     </p>
                                                 </div>
                                                 <p className="text-xs text-base-content/50">
-                                                    PNG, JPG, GIF, WebP (máx. 10MB)
+                                                    PNG, JPG, GIF, WebP (máx. {MAX_FILE_SIZE_MB}MB)
                                                 </p>
                                             </div>
                                         ) : (
@@ -330,7 +378,8 @@ export default function Galeria() {
                                                     <img
                                                         src={preview}
                                                         alt="Vista previa de la imagen seleccionada"
-                                                        className="max-h-48 rounded-lg shadow-md mx-auto object-contain"
+                                                        className={`max-h-48 rounded-lg shadow-md mx-auto object-contain
+                                                            ${isFileTooLarge ? "ring-2 ring-error ring-offset-2" : ""}`}
                                                     />
                                                     <button
                                                         type="button"
@@ -350,7 +399,14 @@ export default function Galeria() {
                                                         <p className="font-medium truncate max-w-[200px] mx-auto">
                                                             {selectedFile.name}
                                                         </p>
-                                                        <p>{formatFileSize(selectedFile.size)}</p>
+                                                        <p className={`${isFileTooLarge ? "text-error font-bold" : ""}`}>
+                                                            {formatFileSize(selectedFile.size)}
+                                                            {isFileTooLarge && (
+                                                                <span className="ml-1">
+                                                                    (excede {MAX_FILE_SIZE_MB}MB)
+                                                                </span>
+                                                            )}
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>
@@ -370,9 +426,10 @@ export default function Galeria() {
                                     {/* Botón de Subir */}
                                     <button
                                         type="submit"
-                                        disabled={!selectedFile || isSubmitting}
+                                        // Deshabilitar si hay error de cliente, no hay archivo, o se está enviando
+                                        disabled={!selectedFile || !!clientError || isFileTooLarge || isSubmitting}
                                         className="btn btn-primary w-full gap-2"
-                                        aria-disabled={!selectedFile || isSubmitting}
+                                        aria-disabled={!selectedFile || !!clientError || isFileTooLarge || isSubmitting}
                                     >
                                         {isSubmitting && !isDeleting ? (
                                             <>
@@ -393,7 +450,7 @@ export default function Galeria() {
                                 <ul className="text-xs text-base-content/60 space-y-1">
                                     <li>• Las imágenes se almacenan en Cloudinary</li>
                                     <li>• Formatos soportados: JPG, PNG, GIF, WebP</li>
-                                    <li>• Tamaño máximo: 10MB por imagen</li>
+                                    <li>• Tamaño máximo: {MAX_FILE_SIZE_MB}MB por imagen</li>
                                 </ul>
                             </div>
                         </div>

@@ -7,7 +7,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const FOLDER = process.env.CLOUDINARY_FOLDER || "mi-app";
+const FOLDER = process.env.CLOUDINARY_FOLDER;
 
 // Subir imagen
 export async function uploadImageToCloudinary(file: File) {
@@ -16,7 +16,7 @@ export async function uploadImageToCloudinary(file: File) {
 
     return new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-            { 
+            {
                 folder: FOLDER,
                 resource_type: "image"
             },
@@ -40,7 +40,7 @@ export async function getImagesFromCloudinary() {
         max_results: 100,
         resource_type: "image",
     });
-    
+
     return result.resources;
 }
 
