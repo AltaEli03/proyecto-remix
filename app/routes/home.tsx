@@ -8,7 +8,8 @@ import {
   Images,
   AlertTriangle,
   Rocket,
-  CameraIcon
+  CameraIcon,
+  MousePointer2
 } from "lucide-react";
 import pool from "~/utils/db.server";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -52,7 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     await pool.execute(
-      'INSERT INTO usuarios (nombre) VALUES (?)',
+      'INSERT INTO captcha (nombre) VALUES (?)',
       [usuarioData]
     );
     return data({ success: true, message: "¡Datos guardados correctamente!", error: null });
@@ -117,8 +118,8 @@ export default function Index() {
     {
       to: "/carrusel",
       icon: Images,
-      label: "Carrusel",
-      description: "Galería con Lorem Picsum",
+      label: "Carrusel con Fetch API",
+      description: "Galería con Lorem Picsum con Fetch API",
       color: "btn-accent",
     },
     {
@@ -134,6 +135,13 @@ export default function Index() {
       label: "Galería Cloudinary",
       description: "Subida de imágenes real",
       color: "btn-warning",
+    },
+    {
+      to: "/dom-manipulation",
+      icon: MousePointer2,
+      label: "Manipulación DOM",
+      description: "useRef, Canvas, Focus, Observers",
+      color: "btn-success",
     },
   ];
 

@@ -8,4 +8,5 @@ export default [
   route("carrusel", "routes/carrusel.tsx"),
   route("trigger-error", "routes/trigger-error.tsx"),
   route("galeria", "routes/galeria.tsx"),
+  route("dom-manipulation", "routes/dom-manipulation.tsx"),
 ] satisfies RouteConfig;
