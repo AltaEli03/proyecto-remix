@@ -1,0 +1,519 @@
+// app/routes/auth/login.tsx
+import { Form, redirect, useActionData, useNavigation, Link, useSearchParams } from "react-router";
+import { useRef, useEffect, useState } from "react";
+import {
+  LogIn,
+  Mail,
+  Lock,
+  ShieldCheck,
+  KeyRound,
+  ArrowLeft,
+  Eye,
+  EyeOff
+} from "lucide-react";
+import type { Route } from "./+types/login";
+import {
+  getUserByEmail,
+  getUserById,
+  verifyPassword,
+  generateTokens,
+  storeRefreshToken,
+  verifyMFAToken,
+  verifyBackupCode,
+  isAccountLocked,
+  incrementFailedAttempts,
+  resetFailedAttempts
+} from "~/utils/auth.server";
+import { validateFormData, loginSchema, mfaCodeSchema } from "~/utils/validation.server";
+import { getSession, commitSession } from "~/utils/sessions.server";
+import { logSecurityEvent, getDeviceInfo, getClientIP } from "~/services/security.server";
+import { sendLoginAlertEmail } from "~/services/email.server";
+import { redirectIfAuthenticated } from "~/utils/auth.guard";
+import { Alert } from "~/components/Alert";
+
+export function meta() {
+  return [
+    { title: "Iniciar Sesión | Mi App" },
+    { name: "description", content: "Inicia sesión en tu cuenta" }
+  ];
+}
+
+export async function loader({ request }: Route.LoaderArgs) {
+  await redirectIfAuthenticated(request);
+  return null;
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const session = await getSession(request.headers.get("Cookie"));
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  // =====================================
+  // PASO 1: VALIDAR CREDENCIALES
+  // =====================================
+  if (intent === "login") {
+    const validation = validateFormData(loginSchema, formData);
+
+    if (!validation.success) {
+      return { step: 'login', errors: validation.errors };
+    }
+
+    const { email, password } = validation.data;
+
+    const user = await getUserByEmail(email);
+
+    if (!user) {
+      return {
+        step: 'login',
+        errors: { general: 'Email o contraseña incorrectos' }
+      };
+    }
+
+    if (isAccountLocked(user)) {
+      return {
+        step: 'login',
+        errors: {
+          general: 'Cuenta bloqueada temporalmente. Intenta más tarde.'
+        }
+      };
+    }
+
+    const validPassword = await verifyPassword(password, user.password_hash);
+
+    if (!validPassword) {
+      const locked = await incrementFailedAttempts(user.id);
+      await logSecurityEvent('login_failed', user.id, request);
+
+      if (locked) {
+        await logSecurityEvent('account_locked', user.id, request);
+        return {
+          step: 'login',
+          errors: {
+            general: 'Cuenta bloqueada por múltiples intentos fallidos'
+          }
+        };
+      }
+
+      return {
+        step: 'login',
+        errors: { general: 'Email o contraseña incorrectos' }
+      };
+    }
+
+    if (!user.is_verified) {
+      return {
+        step: 'login',
+        errors: {
+          general: 'Por favor verifica tu email antes de iniciar sesión'
+        }
+      };
+    }
+
+    if (user.mfa_enabled) {
+      session.set("auth_pending_user_id", user.id);
+      return redirect("/auth/login?step=mfa", {
+        headers: { "Set-Cookie": await commitSession(session) }
+      });
+    }
+
+    return await completeLogin(user, session, request);
+  }
+
+  // =====================================
+  // PASO 2: VALIDAR CÓDIGO MFA
+  // =====================================
+  if (intent === "mfa") {
+    const userId = session.get("auth_pending_user_id");
+
+    if (!userId) {
+      return redirect("/auth/login");
+    }
+
+    const code = formData.get("code") as string;
+    const isBackupCode = formData.get("useBackup") === "true";
+
+    const user = await getUserById(userId);
+
+    if (!user) {
+      return redirect("/auth/login");
+    }
+
+    let isValid = false;
+
+    if (isBackupCode) {
+      isValid = await verifyBackupCode(user.id, code);
+    } else {
+      const validation = validateFormData(mfaCodeSchema, formData);
+      if (!validation.success) {
+        return { step: 'mfa', errors: validation.errors };
+      }
+      isValid = await verifyMFAToken(code, user.mfa_secret!);
+    }
+
+    if (!isValid) {
+      return {
+        step: 'mfa',
+        errors: { code: 'Código inválido' }
+      };
+    }
+
+    session.unset("auth_pending_user_id");
+    return await completeLogin(user, session, request);
+  }
+
+  return { step: 'login', errors: { general: 'Acción no válida' } };
+}
+
+async function completeLogin(user: any, session: any, request: Request) {
+  await resetFailedAttempts(user.id);
+
+  const { accessToken, refreshToken } = generateTokens(user);
+
+  const deviceInfo = getDeviceInfo(request);
+  const ipAddress = getClientIP(request);
+  await storeRefreshToken(user.id, refreshToken, deviceInfo, ipAddress);
+
+  session.set("accessToken", accessToken);
+  session.set("refreshToken", refreshToken);
+
+  await logSecurityEvent('login_success', user.id, request);
+
+  if (process.env.NODE_ENV === 'production') {
+    await sendLoginAlertEmail(user.email, deviceInfo, ipAddress);
+  }
+
+  return redirect("/", {
+    headers: { "Set-Cookie": await commitSession(session) }
+  });
+}
+
+export default function Login() {
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const [searchParams] = useSearchParams();
+  const isSubmitting = navigation.state === 'submitting';
+
+  const [showPassword, setShowPassword] = useState(false);
+
+  const step = searchParams.get('step') || 'login';
+  const registered = searchParams.get('registered') === 'true';
+  const expired = searchParams.get('expired') === 'true';
+  const reset = searchParams.get('reset') === 'success';
+  const loggedout = searchParams.get('loggedout');
+
+  const hasErrors = actionData?.errors && Object.values(actionData.errors).some((error) => error);
+
+  return (
+    <main className="min-h-screen bg-base-200 p-4">
+      <div className="container mx-auto max-w-md">
+        <section
+          aria-labelledby="login-title"
+          className="card bg-base-100 shadow-xl"
+        >
+          <div className="card-body">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="avatar placeholder">
+                <div className="bg-primary text-primary-content rounded-full w-12 h-12 flex items-center justify-center">
+                  {step === 'mfa' ? (
+                    <ShieldCheck className="w-6 h-6" aria-hidden="true" />
+                  ) : (
+                    <LogIn className="w-6 h-6" aria-hidden="true" />
+                  )}
+                </div>
+              </div>
+              <div>
+                <h1 id="login-title" className="card-title text-2xl">
+                  {step === 'mfa' ? 'Verificación de Dos Factores' : 'Iniciar Sesión'}
+                </h1>
+                <p className="text-base-content/60 text-sm">
+                  {step === 'mfa'
+                    ? 'Ingresa el código de tu app de autenticación'
+                    : 'Accede a tu cuenta de forma segura'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Mensajes de estado usando Alert */}
+            <Alert
+              type="success"
+              message={registered ? "¡Cuenta creada! Revisa tu email para verificarla." : null}
+              dismissible
+              autoClose={5000}
+              className="mb-4"
+            />
+
+            <Alert
+              type="success"
+              message={reset ? "¡Contraseña actualizada! Ya puedes iniciar sesión." : null}
+              dismissible
+              autoClose={5000}
+              className="mb-4"
+            />
+
+            <Alert
+              type="info"
+              message={loggedout === 'all' ? "Todas las sesiones han sido cerradas." : null}
+              dismissible
+              autoClose={5000}
+              className="mb-4"
+            />
+
+            <Alert
+              type="warning"
+              message={expired ? "Tu sesión expiró. Por favor inicia sesión nuevamente." : null}
+              dismissible
+              className="mb-4"
+            />
+
+            <Alert
+              type="error"
+              message={hasErrors ? (actionData?.errors?.general || 'Por favor, completa los campos marcados.') : null}
+              dismissible
+              className="mb-4"
+            />
+
+            {/* Formulario de Login */}
+            {step === 'login' && (
+              <Form method="post" noValidate className="space-y-4">
+                <input type="hidden" name="intent" value="login" />
+
+                {/* Email */}
+                <div className="form-control">
+                  <label className="label" htmlFor="email">
+                    <span className="label-text font-medium flex items-center gap-2">
+                      <Mail className="w-4 h-4" aria-hidden="true" />
+                      Correo electrónico
+                      <span className="text-error" aria-hidden="true">*</span>
+                    </span>
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    className={`input input-bordered w-full ${actionData?.errors?.email ? 'input-error' : ''}`}
+                    placeholder="tu@email.com"
+                    required
+                    autoComplete="email"
+                    aria-required="true"
+                    aria-invalid={!!actionData?.errors?.email}
+                  />
+                  {actionData?.errors?.email ? (
+                    <label className="label">
+                      <span className="label-text-alt text-error">
+                        {actionData.errors.email}
+                      </span>
+                    </label>
+                  ) : (
+                    <label className="label">
+                      <span className="label-text-alt text-base-content/50">
+                        Ingresa el email asociado a tu cuenta
+                      </span>
+                    </label>
+                  )}
+                </div>
+
+                {/* Contraseña */}
+                <div className="form-control">
+                  <label className="label" htmlFor="password">
+                    <span className="label-text font-medium flex items-center gap-2">
+                      <Lock className="w-4 h-4" aria-hidden="true" />
+                      Contraseña
+                      <span className="text-error" aria-hidden="true">*</span>
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      className={`input input-bordered w-full pr-12 ${actionData?.errors?.password ? 'input-error' : ''}`}
+                      placeholder="Tu contraseña"
+                      required
+                      autoComplete="current-password"
+                      aria-required="true"
+                      aria-invalid={!!actionData?.errors?.password}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="w-4 h-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  {actionData?.errors?.password ? (
+                    <label className="label">
+                      <span className="label-text-alt text-error">
+                        {actionData.errors.password}
+                      </span>
+                    </label>
+                  ) : (
+                    <label className="label">
+                      <Link
+                        to="/auth/forgot-password"
+                        className="label-text-alt link link-hover text-primary"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </Link>
+                    </label>
+                  )}
+                </div>
+
+                {/* Botón de Login */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn btn-primary w-full gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="loading loading-spinner w-4 h-4" aria-hidden="true" />
+                      Verificando...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" aria-hidden="true" />
+                      Iniciar Sesión
+                    </>
+                  )}
+                </button>
+              </Form>
+            )}
+
+            {/* Formulario de MFA */}
+            {step === 'mfa' && (
+              <div className="space-y-4">
+                <div className="bg-base-200 rounded-lg p-4 text-center">
+                  <ShieldCheck className="w-12 h-12 mx-auto text-primary mb-2" aria-hidden="true" />
+                  <p className="text-sm text-base-content/70">
+                    Ingresa el código de 6 dígitos de tu aplicación de autenticación
+                  </p>
+                </div>
+
+                <Alert
+                  type="error"
+                  message={actionData?.errors?.code}
+                  dismissible
+                  className="mb-2"
+                />
+
+                <Form method="post" noValidate className="space-y-4">
+                  <input type="hidden" name="intent" value="mfa" />
+
+                  <div className="form-control">
+                    <label className="label" htmlFor="code">
+                      <span className="label-text font-medium flex items-center gap-2">
+                        <KeyRound className="w-4 h-4" aria-hidden="true" />
+                        Código de verificación
+                        <span className="text-error" aria-hidden="true">*</span>
+                      </span>
+                    </label>
+                    <input
+                      id="code"
+                      name="code"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      className={`input input-bordered w-full text-center text-2xl tracking-widest font-mono ${actionData?.errors?.code ? 'input-error' : ''}`}
+                      placeholder="000000"
+                      required
+                      autoComplete="one-time-code"
+                      autoFocus
+                      aria-required="true"
+                      aria-invalid={!!actionData?.errors?.code}
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-base-content/50">
+                        El código cambia cada 30 segundos
+                      </span>
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="btn btn-primary w-full gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="loading loading-spinner w-4 h-4" aria-hidden="true" />
+                        Verificando...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                        Verificar Código
+                      </>
+                    )}
+                  </button>
+                </Form>
+
+                <div className="divider text-xs text-base-content/50">
+                  ¿Problemas con el código?
+                </div>
+
+                {/* Código de respaldo */}
+                <details className="collapse collapse-arrow bg-base-200 rounded-lg">
+                  <summary className="collapse-title text-sm font-medium">
+                    <span className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4" aria-hidden="true" />
+                      Usar código de respaldo
+                    </span>
+                  </summary>
+                  <div className="collapse-content">
+                    <Form method="post" noValidate className="space-y-3 pt-2">
+                      <input type="hidden" name="intent" value="mfa" />
+                      <input type="hidden" name="useBackup" value="true" />
+                      <input
+                        name="code"
+                        type="text"
+                        className="input input-bordered input-sm w-full font-mono"
+                        placeholder="XXXX-XXXX"
+                        required
+                        aria-label="Código de respaldo"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="btn btn-outline btn-sm w-full"
+                      >
+                        Usar código de respaldo
+                      </button>
+                    </Form>
+                  </div>
+                </details>
+
+                <Link to="/auth/login" className="btn btn-ghost w-full gap-2">
+                  <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                  Volver al login
+                </Link>
+              </div>
+            )}
+
+            {step === 'login' && (
+              <>
+                <div className="divider text-base-content/50">¿No tienes cuenta?</div>
+                <Link to="/auth/register" className="btn btn-outline w-full">
+                  Crear una cuenta
+                </Link>
+              </>
+            )}
+
+            <div className="divider"></div>
+            <Link to="/" className="btn btn-ghost">
+              ← Volver al Inicio
+            </Link>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

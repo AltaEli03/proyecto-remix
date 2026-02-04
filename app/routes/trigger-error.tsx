@@ -1,7 +1,7 @@
 // app/routes/trigger-error.tsx
 import type { Route } from "./+types/home";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Error de Prueba | Mi App" },
   ];

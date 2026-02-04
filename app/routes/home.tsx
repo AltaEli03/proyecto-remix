@@ -1,6 +1,6 @@
 // app/routes/home.tsx
 import { type ActionFunctionArgs, data } from "react-router";
-import { Form, useActionData, useNavigation, Link } from "react-router";
+import { Form, useActionData, useNavigation, Link, useLoaderData } from "react-router";
 import { useRef, useState, useEffect } from "react";
 import {
   Calculator,
@@ -14,6 +14,8 @@ import {
 import pool from "~/utils/db.server";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { Alert } from "~/components/Alert";
+import { Navbar } from "~/components/Navbar";
+import { getOptionalUser } from "~/utils/auth.guard";
 import type { Route } from "./+types/home";
 
 import ReCAPTCHA_ from "react-google-recaptcha";
@@ -25,6 +27,13 @@ export function meta({ }: Route.MetaArgs) {
     { title: "Registro Seguro | Mi App" },
     { name: "description", content: "Formulario de registro seguro con validación de Captcha" },
   ];
+}
+
+// --- LOADER ---
+export async function loader({ request }: Route.LoaderArgs) {
+  // Obtener usuario opcionalmente (no redirige si no está autenticado)
+  const user = await getOptionalUser(request);
+  return { user };
 }
 
 // --- BACKEND ---
@@ -68,6 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // --- FRONTEND ---
 export default function Index() {
+  const { user } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const recaptchaRef = useRef<any>(null);
@@ -148,6 +158,23 @@ export default function Index() {
   return (
     <main className="min-h-screen bg-base-200 p-4">
       <div className="container mx-auto max-w-4xl">
+        {/* Navbar con estado de autenticación */}
+        <Navbar user={user} currentPath="/" />
+
+        {/* Mensaje de bienvenida si está autenticado */}
+        {user && (
+          <div className="alert alert-success mb-6 shadow-lg">
+            <div>
+              <span className="font-medium">
+                ¡Hola, {user.fullName}!
+              </span>
+              <span className="text-sm opacity-80 ml-2">
+                Estás conectado con el correo {user.email}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Breadcrumb - en home mostramos solo "Inicio" actual */}
         <Breadcrumb items={[]} />
 
@@ -179,7 +206,7 @@ export default function Index() {
                   type="success"
                   message={actionData?.message}
                   dismissible={true}
-                  autoClose={5000} // Se cierra automáticamente en 5 segundos
+                  autoClose={5000}
                   className="mt-2"
                 />
               )}
