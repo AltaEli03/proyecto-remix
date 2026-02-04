@@ -498,7 +498,7 @@ export async function registerUserAtomic(
 ): Promise<{ userId: number; verificationToken: string }> {
 
     return await transaction(async (conn: PoolConnection) => {
-        // 1. Verificar que el email no exista (dentro de la transacción para evitar race conditions)
+        // 1. Verificar que el email no exista
         const existingUser = await conn.query(
             'SELECT id FROM users WHERE email = ? FOR UPDATE',
             [email]
@@ -514,19 +514,20 @@ export async function registerUserAtomic(
         // 3. Crear usuario
         const userResult = await conn.query(
             `INSERT INTO users (email, password_hash, full_name, is_verified, created_at, updated_at)
-       VALUES (?, ?, ?, false, NOW(), NOW())`,
+             VALUES (?, ?, ?, false, NOW(), NOW())`,
             [email, hashedPassword, name]
         );
         const userId = userResult.insertId;
 
         // 4. Crear token de verificación
         const verificationToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+        const tokenHash = hashToken(verificationToken);  // ✅ Hashear el token
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
         await conn.query(
-            `INSERT INTO email_verifications (user_id, token, expires_at, created_at)
-       VALUES (?, ?, ?, NOW())`,
-            [userId, verificationToken, expiresAt]
+            `INSERT INTO email_verifications (user_id, token_hash, expires_at)
+             VALUES (?, ?, ?)`,  // ✅ Usar token_hash y quitar created_at (tiene default)
+            [userId, tokenHash, expiresAt]
         );
 
         // 5. Registrar evento de seguridad
@@ -537,7 +538,7 @@ export async function registerUserAtomic(
 
         await conn.query(
             `INSERT INTO security_logs (user_id, action, ip_address, user_agent, details) 
-       VALUES (?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?)`,
             [
                 userId,
                 'registration_initiated',
@@ -547,7 +548,6 @@ export async function registerUserAtomic(
             ]
         );
 
-        // Si llegamos aquí, todo fue exitoso y la transacción se commitea
         return { userId, verificationToken };
     });
 }

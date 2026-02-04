@@ -18,6 +18,8 @@ const APP_URL = process.env.NODE_ENV === 'development'
     ? 'http://localhost:5173'
     : process.env.APP_URL;
 
+if (!APP_URL) throw new Error("APP_URL debe estar definido en producción");
+
 // PLANTILLAS DE EMAIL
 
 function baseTemplate(content: string): string {

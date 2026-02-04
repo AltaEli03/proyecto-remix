@@ -1,6 +1,6 @@
 // app/routes/auth/register.tsx
-import { Form, redirect, useActionData, useNavigation, Link } from "react-router";
-import {useState } from "react";
+import { Form, useActionData, useNavigation, Link } from "react-router";
+import { useState } from "react";
 import {
   UserPlus,
   User,
@@ -13,18 +13,19 @@ import {
   ShieldCheck,
   AlertCircle
 } from "lucide-react";
-import type { Route } from "./+types/register";
-import {
-  getUserByEmail,
-  createUser,
-  createEmailVerification,
-  registerUserAtomic
-} from "~/utils/auth.server";
-import { validateFormData, registerSchema } from "~/utils/validation.server";
-import { sendVerificationEmail } from "~/services/email.server";
-import { logSecurityEvent } from "~/services/security.server";
-import { redirectIfAuthenticated } from "~/utils/auth.guard";
 import { Alert } from "~/components/Alert";
+export { loader, action } from "../../utils/register.server";
+
+// Tipos para el action data
+type ActionData = {
+  errors?: {
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    general?: string;
+  };
+};
 
 const FIELD_LIMITS = {
   name: { min: 2, max: 50 },
@@ -37,65 +38,6 @@ export function meta() {
     { title: "Registro | Mi App" },
     { name: "description", content: "Crea tu cuenta en Mi App" }
   ];
-}
-
-export async function loader({ request }: Route.LoaderArgs) {
-  await redirectIfAuthenticated(request);
-  return null;
-}
-
-export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.formData();
-
-  // Validación del formulario
-  const validation = validateFormData(registerSchema, formData);
-
-  if (!validation.success) {
-    return { errors: validation.errors };
-  }
-
-  const { email, password, name } = validation.data;
-
-  try {
-    // ✅ Todo el proceso de registro en una transacción atómica
-    const { userId, verificationToken } = await registerUserAtomic(
-      email,
-      password,
-      name,
-      request
-    );
-
-    // 📧 Envío de email DESPUÉS de que la transacción fue exitosa
-    // Si esto falla, el usuario existe pero puede solicitar reenvío
-    try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (emailError) {
-      console.error('Error enviando email de verificación:', emailError);
-      // Redirigir con indicador de que el email está pendiente
-      return redirect('/auth/login?registered=true&emailPending=true');
-    }
-
-    return redirect('/auth/login?registered=true');
-
-  } catch (error) {
-    console.error('Error en registro:', error);
-    
-    // Manejar error específico de email duplicado
-    if (error instanceof Error && error.message === 'EMAIL_EXISTS') {
-      return {
-        errors: {
-          email: 'Ya existe una cuenta con este email'
-        }
-      };
-    }
-    
-    // Error genérico - la transacción ya hizo rollback automáticamente
-    return {
-      errors: {
-        general: 'Ocurrió un error al crear tu cuenta. Inténtalo de nuevo.'
-      }
-    };
-  }
 }
 
 const getCharacterProgress = (current: number, max: number) => {
@@ -119,7 +61,8 @@ const passwordRequirements: PasswordRequirement[] = [
 ];
 
 export default function Register() {
-  const actionData = useActionData<typeof action>();
+  // ✅ Usar el tipo explícito en lugar de typeof action
+  const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
 
