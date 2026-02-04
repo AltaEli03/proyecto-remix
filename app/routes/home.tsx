@@ -24,8 +24,8 @@ const ReCAPTCHA = ReCAPTCHA_.default || ReCAPTCHA_;
 
 export function meta({ }: Route.MetaArgs) {
   return [
-    { title: "Registro Seguro | Mi App" },
-    { name: "description", content: "Formulario de registro seguro con validación de Captcha" },
+    { title: "Inicio | Mi App" },
+    { name: "description", content: "Proyecto hecho con React Router" },
   ];
 }
 
