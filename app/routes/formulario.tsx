@@ -1,6 +1,6 @@
 // app/routes/formulario.tsx
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import {
     FileText,
     User,
@@ -13,13 +13,21 @@ import {
     Calendar
 } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import type { Route } from "./+types/home";
+import { Navbar } from "~/components/Navbar";
+import { getOptionalUser } from "~/utils/auth.guard";
+import type { Route } from "./+types/formulario";
 
 export function meta({ }: Route.MetaArgs) {
     return [
         { title: "Formulario de Contacto | Mi App" },
         { name: "description", content: "Formulario con validación de entradas" },
     ];
+}
+
+// ✅ AGREGAR LOADER
+export async function loader({ request }: Route.LoaderArgs) {
+    const user = await getOptionalUser(request);
+    return { user };
 }
 
 // Constantes para límites de longitud
@@ -91,6 +99,9 @@ const formatDate = (dateString: string): string => {
 };
 
 export default function Formulario() {
+    // ✅ OBTENER USER DEL LOADER
+    const { user } = useLoaderData<typeof loader>();
+
     const [formData, setFormData] = useState<FormData>({
         nombre: "",
         email: "",
@@ -150,7 +161,6 @@ export default function Formulario() {
                 const selectedDate = new Date(value);
                 const today = new Date();
 
-                // Verificar que la fecha no sea futura
                 if (selectedDate > today) {
                     return "La fecha de nacimiento no puede ser en el futuro.";
                 }
@@ -185,7 +195,6 @@ export default function Formulario() {
     ) => {
         const { name, value } = e.target;
 
-        // Para teléfono, solo permitir dígitos
         if (name === "telefono") {
             const numericValue = value.replace(/\D/g, "");
             setFormData((prev) => ({ ...prev, [name]: numericValue }));
@@ -251,7 +260,6 @@ export default function Formulario() {
         setIsSubmitted(false);
     };
 
-    // Helper para calcular el porcentaje de uso
     const getCharacterProgress = (current: number, max: number) => {
         const percentage = (current / max) * 100;
         if (percentage >= 90) return "text-error";
@@ -260,14 +268,16 @@ export default function Formulario() {
     };
 
     const hasErrors = Object.values(errors).some((error) => error);
-
-    // Calcular la edad actual si hay fecha seleccionada
     const currentAge = formData.fechaNacimiento ? calculateAge(formData.fechaNacimiento) : null;
 
+    // ✅ VISTA DE ÉXITO CON NAVBAR
     if (isSubmitted) {
         return (
             <main className="min-h-screen bg-base-200 p-4">
                 <div className="container mx-auto max-w-lg">
+                    {/* ✅ NAVBAR EN VISTA DE ÉXITO */}
+                    <Navbar user={user} currentPath="/formulario" />
+                    
                     <Breadcrumb items={[{ label: "Formulario" }]} />
 
                     <div
@@ -323,9 +333,13 @@ export default function Formulario() {
         );
     }
 
+    // ✅ VISTA PRINCIPAL CON NAVBAR
     return (
         <main className="min-h-screen bg-base-200 p-4">
             <div className="container mx-auto max-w-lg">
+                {/* ✅ AGREGAR NAVBAR */}
+                <Navbar user={user} currentPath="/formulario" />
+                
                 <Breadcrumb items={[{ label: "Formulario" }]} />
 
                 <section aria-labelledby="form-title" className="card bg-base-100 shadow-xl">
@@ -553,7 +567,6 @@ export default function Formulario() {
                                     </label>
                                 )}
 
-                                {/* Barra de progreso visual para el mensaje */}
                                 <progress
                                     className={`progress w-full h-1 ${formData.mensaje.length >= FIELD_LIMITS.mensaje.max * 0.9
                                         ? "progress-error"

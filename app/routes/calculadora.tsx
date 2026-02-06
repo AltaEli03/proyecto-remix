@@ -1,9 +1,11 @@
 // app/routes/calculadora.tsx
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { Calculator, Plus, Divide, RotateCcw, AlertCircle } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import type { Route } from "./+types/home";
+import { Navbar } from "~/components/Navbar";
+import { getOptionalUser } from "~/utils/auth.guard";
+import type { Route } from "./+types/calculadora";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -12,7 +14,16 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+// ✅ AGREGAR LOADER
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await getOptionalUser(request);
+  return { user };
+}
+
 export default function Calculadora() {
+  // ✅ OBTENER USER DEL LOADER
+  const { user } = useLoaderData<typeof loader>();
+  
   const [numero1, setNumero1] = useState<string>("");
   const [numero2, setNumero2] = useState<string>("");
   const [resultado, setResultado] = useState<number | null>(null);
@@ -76,12 +87,16 @@ export default function Calculadora() {
   return (
     <main className="min-h-screen bg-base-200 p-4">
       <div className="container mx-auto max-w-lg">
+        {/* ✅ AGREGAR NAVBAR */}
+        <Navbar user={user} currentPath="/calculadora" />
+        
         <Breadcrumb items={[{ label: "Calculadora" }]} />
 
         <section 
           aria-labelledby="calc-title" 
           className="card bg-base-100 shadow-xl"
         >
+          {/* ... resto del contenido igual ... */}
           <div className="card-body">
             {/* Header */}
             <div className="flex items-center gap-3 mb-4">
@@ -125,7 +140,6 @@ export default function Calculadora() {
                   }}
                   className="input input-bordered w-full"
                   placeholder="Ej: 10"
-                  aria-describedby={error ? "error-message" : undefined}
                 />
               </div>
 
@@ -154,29 +168,23 @@ export default function Calculadora() {
                 type="button"
                 onClick={sumar}
                 className="btn btn-primary gap-2"
-                aria-label="Sumar los dos números"
               >
-                <Plus className="w-5 h-5" aria-hidden="true" />
+                <Plus className="w-5 h-5" />
                 Sumar
               </button>
               <button
                 type="button"
                 onClick={dividir}
                 className="btn btn-secondary gap-2"
-                aria-label="Dividir el primer número entre el segundo"
               >
-                <Divide className="w-5 h-5" aria-hidden="true" />
+                <Divide className="w-5 h-5" />
                 Dividir
               </button>
             </div>
 
             {/* Resultado */}
             {resultado !== null && (
-              <div 
-                className="stats shadow mt-6 w-full bg-gradient-to-r from-primary/10 to-secondary/10"
-                role="status"
-                aria-live="polite"
-              >
+              <div className="stats shadow mt-6 w-full bg-gradient-to-r from-primary/10 to-secondary/10">
                 <div className="stat">
                   <div className="stat-title">Operación</div>
                   <div className="stat-value text-primary text-2xl">
@@ -193,7 +201,7 @@ export default function Calculadora() {
               onClick={limpiar}
               className="btn btn-outline btn-ghost gap-2 mt-4"
             >
-              <RotateCcw className="w-4 h-4" aria-hidden="true" />
+              <RotateCcw className="w-4 h-4" />
               Limpiar todo
             </button>
 

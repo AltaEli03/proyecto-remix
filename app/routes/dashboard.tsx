@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import type { Route } from "./+types/dashboard";
 import { requireAuth } from "~/utils/auth.guard";
+import { Navbar } from "~/components/Navbar"; // ✅ IMPORTAR NAVBAR
 
 export function meta() {
     return [
         { title: "Dashboard | Mi App" },
         { name: "description", content: "Tu panel de control" },
-        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" }
     ];
 }
 
@@ -36,6 +36,11 @@ export default function Dashboard() {
 
     return (
         <main className="min-h-screen bg-base-200 safe-area-inset">
+            {/* ✅ AGREGAR NAVBAR */}
+            <div className="container mx-auto max-w-6xl px-2 sm:px-4 pt-4">
+                <Navbar user={user} currentPath="/dashboard" />
+            </div>
+
             {/* Main Content */}
             <div className="container mx-auto max-w-6xl px-2 sm:px-4 py-4 sm:py-6">
                 {/* Welcome Card */}

@@ -9,7 +9,8 @@ import {
   AlertTriangle,
   Rocket,
   CameraIcon,
-  MousePointer2
+  MousePointer2,
+  Database
 } from "lucide-react";
 import pool from "~/utils/db.server";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -147,10 +148,10 @@ export default function Index() {
       color: "btn-warning",
     },
     {
-      to: "/dom-manipulation",
-      icon: MousePointer2,
-      label: "Manipulación DOM",
-      description: "useRef, Canvas, Focus, Observers",
+      to: "/crud",
+      icon: Database,
+      label: "Gestión CRUD",
+      description: "CRUD completo de registros",
       color: "btn-success",
     },
   ];

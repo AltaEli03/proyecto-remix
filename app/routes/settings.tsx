@@ -24,10 +24,13 @@ import {
     ChevronLeft,
     Smartphone,
     Monitor,
-    Tablet
+    Tablet,
+    Trash2,
+    AlertTriangle
 } from "lucide-react";
 import type { Route } from "./+types/settings";
 import { requireAuth } from "~/utils/auth.guard";
+import { Navbar } from "~/components/Navbar"; // ✅ IMPORTAR NAVBAR
 import {
     getUserById,
     hashPassword,
@@ -35,7 +38,8 @@ import {
     revokeAllUserTokens,
     getBackupCodesStats,
     regenerateBackupCodes,
-    type BackupCodesStats
+    type BackupCodesStats,
+    deleteUserAccount
 } from "~/utils/auth.server";
 import { execute, query } from "~/utils/db.server";
 import { validateFormData, passwordResetSchema } from "~/utils/validation.server";
@@ -262,6 +266,49 @@ export async function action({ request }: Route.ActionArgs) {
         });
     }
 
+    if (intent === "delete-account") {
+        const password = formData.get("password") as string;
+        const confirmation = formData.get("confirmation") as string;
+
+        if (!password) {
+            return { intent, error: "La contraseña es requerida" };
+        }
+
+        if (confirmation !== "ELIMINAR MI CUENTA") {
+            return { intent, error: "Debes escribir exactamente 'ELIMINAR MI CUENTA' para confirmar" };
+        }
+
+        const dbUser = await getUserById(user.id);
+        if (!dbUser) {
+            return { intent, error: "Usuario no encontrado" };
+        }
+
+        const isValid = await verifyPassword(password, dbUser.password_hash);
+        if (!isValid) {
+            await logSecurityEvent('login_failed', user.id, request, {
+                context: 'account_deletion_attempt'
+            });
+            return { intent, error: "Contraseña incorrecta" };
+        }
+
+        await logSecurityEvent('account_deleted', user.id, request, {
+            email: user.email
+        });
+
+        await deleteUserAccount(user.id);
+
+        session.unset("accessToken");
+        session.unset("refreshToken");
+
+        return new Response(null, {
+            status: 302,
+            headers: {
+                Location: "/?account_deleted=true",
+                "Set-Cookie": await commitSession(session)
+            }
+        });
+    }
+
     return null;
 }
 
@@ -292,7 +339,6 @@ export default function SettingsPage() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const tabsContainerRef = useRef<HTMLDivElement>(null);
 
-    // Definir tabs con configuración
     const tabs: TabConfig[] = [
         { id: 'profile', label: 'Perfil', icon: <User className="w-4 h-4" /> },
         { id: 'security', label: 'Seguridad', icon: <Shield className="w-4 h-4" /> },
@@ -320,7 +366,6 @@ export default function SettingsPage() {
         }
     }, []);
 
-    // Scroll horizontal en tabs para móvil
     useEffect(() => {
         if (tabsContainerRef.current) {
             const activeTabElement = tabsContainerRef.current.querySelector(`[data-tab="${activeTab}"]`);
@@ -330,7 +375,6 @@ export default function SettingsPage() {
         }
     }, [activeTab]);
 
-    // Cerrar menú móvil al cambiar de tab
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
         setIsMobileMenuOpen(false);
@@ -338,12 +382,17 @@ export default function SettingsPage() {
 
     return (
         <main className="min-h-screen bg-base-200 safe-area-inset">
-            {/* Header responsivo */}
-            <header className="sticky top-0 z-40 bg-base-100 shadow-sm safe-area-top">
+            {/* ✅ NAVBAR GLOBAL */}
+            <div className="container mx-auto max-w-6xl px-2 sm:px-4 pt-4">
+                <Navbar user={user} currentPath="/settings" />
+            </div>
+
+            {/* Header de configuración con tabs */}
+            <header className="sticky top-0 z-40 bg-base-100 shadow-sm safe-area-top mt-4">
                 <div className="navbar container mx-auto max-w-6xl px-2 sm:px-4">
                     <div className="flex-none">
-                        <Link 
-                            to="/dashboard" 
+                        <Link
+                            to="/dashboard"
                             className="btn btn-ghost btn-sm sm:btn-md gap-1 sm:gap-2"
                         >
                             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -353,10 +402,9 @@ export default function SettingsPage() {
                     <div className="flex-1 px-2">
                         <h1 className="text-lg sm:text-xl font-bold truncate">Configuración</h1>
                     </div>
-                    
-                    {/* Menú hamburguesa para móvil */}
+
                     <div className="flex-none lg:hidden">
-                        <button 
+                        <button
                             className="btn btn-ghost btn-square"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                             aria-label="Menú"
@@ -366,9 +414,9 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                {/* Tabs horizontales deslizables - visible en tablet y móvil */}
+                {/* Tabs horizontales deslizables */}
                 <div className="lg:hidden border-t border-base-200">
-                    <div 
+                    <div
                         ref={tabsContainerRef}
                         className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -381,8 +429,8 @@ export default function SettingsPage() {
                                 className={`
                                     flex items-center gap-2 px-4 py-3 whitespace-nowrap snap-center
                                     border-b-2 transition-colors min-w-max
-                                    ${activeTab === tab.id 
-                                        ? 'border-primary text-primary font-medium' 
+                                    ${activeTab === tab.id
+                                        ? 'border-primary text-primary font-medium'
                                         : 'border-transparent text-base-content/60 hover:text-base-content'
                                     }
                                 `}
@@ -398,7 +446,7 @@ export default function SettingsPage() {
 
             {/* Overlay del menú móvil */}
             {isMobileMenuOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 z-30 lg:hidden"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
@@ -412,7 +460,7 @@ export default function SettingsPage() {
             `}>
                 <div className="p-4 border-b border-base-200 flex items-center justify-between">
                     <h2 className="font-bold">Menú</h2>
-                    <button 
+                    <button
                         className="btn btn-ghost btn-sm btn-square"
                         onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -427,8 +475,8 @@ export default function SettingsPage() {
                             className={`
                                 w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left
                                 transition-colors
-                                ${activeTab === tab.id 
-                                    ? 'bg-primary/10 text-primary' 
+                                ${activeTab === tab.id
+                                    ? 'bg-primary/10 text-primary'
                                     : 'hover:bg-base-200'
                                 }
                             `}
@@ -467,7 +515,11 @@ export default function SettingsPage() {
                     {/* Contenido del tab activo */}
                     <div className="lg:col-span-3">
                         {activeTab === 'profile' && (
-                            <ProfileTab user={user} />
+                            <ProfileTab
+                                user={user}
+                                actionData={actionData}
+                                isSubmitting={isSubmitting}
+                            />
                         )}
 
                         {activeTab === 'security' && (
@@ -495,54 +547,98 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            {/* Safe area bottom para dispositivos con home indicator */}
             <div className="safe-area-bottom" />
         </main>
     );
 }
 
-function ProfileTab({ user }: { user: any }) {
-    return (
-        <div className="card bg-base-100 shadow">
-            <div className="card-body p-4 sm:p-6">
-                <h2 className="card-title flex items-center gap-2 text-base sm:text-lg">
-                    <User className="w-5 h-5" />
-                    Información del Perfil
-                </h2>
+function ProfileTab({ user, actionData, isSubmitting }: {
+    user: any;
+    actionData: any;
+    isSubmitting: boolean;
+}) {
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                    <div className="form-control">
-                        <label className="label">
-                            <span className="label-text font-medium text-sm">Nombre</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={user.fullName}
-                            className="input input-bordered input-sm sm:input-md"
-                            disabled
-                        />
+    return (
+        <div className="space-y-4 sm:space-y-6">
+            {/* Información del Perfil */}
+            <div className="card bg-base-100 shadow">
+                <div className="card-body p-4 sm:p-6">
+                    <h2 className="card-title flex items-center gap-2 text-base sm:text-lg">
+                        <User className="w-5 h-5" />
+                        Información del Perfil
+                    </h2>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text font-medium text-sm">Nombre</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={user.fullName}
+                                className="input input-bordered input-sm sm:input-md"
+                                disabled
+                            />
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text font-medium text-sm">Email</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={user.email}
+                                className="input input-bordered input-sm sm:input-md"
+                                disabled
+                            />
+                        </div>
                     </div>
 
-                    <div className="form-control">
-                        <label className="label">
-                            <span className="label-text font-medium text-sm">Email</span>
-                        </label>
-                        <input
-                            type="email"
-                            value={user.email}
-                            className="input input-bordered input-sm sm:input-md"
-                            disabled
-                        />
+                    <Alert
+                        type="info"
+                        icon={Mail}
+                        message="Para cambiar tu email o nombre, contacta a soporte."
+                        dismissible={false}
+                        className="mt-4"
+                    />
+                </div>
+            </div>
+
+            {/* Eliminar Cuenta */}
+            <div className="card bg-base-100 shadow border-2 border-error/20">
+                <div className="card-body p-4 sm:p-6">
+                    <h2 className="card-title flex items-center gap-2 text-base sm:text-lg text-error">
+                        <AlertTriangle className="w-5 h-5" />
+                        Eliminar Cuenta
+                    </h2>
+
+                    <p className="text-base-content/60 text-sm mt-2">
+                        Una vez que elimines tu cuenta, no hay vuelta atrás. Por favor, estate seguro.
+                    </p>
+
+                    <div className="mt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowDeleteModal(true)}
+                            className="btn btn-outline btn-error btn-sm sm:btn-md gap-2"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Eliminar mi cuenta
+                        </button>
                     </div>
                 </div>
-
-                <Alert
-                    type="info"
-                    message="Para cambiar tu email o nombre, contacta a soporte."
-                    dismissible={false}
-                    className="mt-4"
-                />
             </div>
+
+            {/* Modal de confirmación */}
+            {showDeleteModal && (
+                <DeleteAccountModal
+                    onClose={() => setShowDeleteModal(false)}
+                    actionData={actionData}
+                    isSubmitting={isSubmitting}
+                    userEmail={user.email}
+                />
+            )}
         </div>
     );
 }
@@ -588,16 +684,16 @@ function SecurityTab({
                         </div>
 
                         {user.mfaEnabled ? (
-                            <Link 
-                                to="/auth/mfa/disable" 
+                            <Link
+                                to="/auth/mfa/disable"
                                 className="btn btn-outline btn-error btn-sm sm:btn-md gap-2 w-full sm:w-auto"
                             >
                                 <ShieldOff className="w-4 h-4" />
                                 Desactivar
                             </Link>
                         ) : (
-                            <Link 
-                                to="/auth/mfa/setup" 
+                            <Link
+                                to="/auth/mfa/setup"
                                 className="btn btn-primary btn-sm sm:btn-md gap-2 w-full sm:w-auto"
                             >
                                 <ShieldCheck className="w-4 h-4" />
@@ -732,7 +828,6 @@ function SecurityTab({
 }
 
 function SessionsTab({ sessions, currentIp }: { sessions: any[], currentIp: string }) {
-    // Detectar tipo de dispositivo basado en device_info
     const getDeviceIcon = (deviceInfo: string) => {
         const info = deviceInfo?.toLowerCase() || '';
         if (info.includes('mobile') || info.includes('android') || info.includes('iphone')) {
@@ -829,8 +924,8 @@ function SessionsTab({ sessions, currentIp }: { sessions: any[], currentIp: stri
                         const isCurrent = session.ip_address === currentIp || index === 0;
 
                         return (
-                            <div 
-                                key={session.id} 
+                            <div
+                                key={session.id}
                                 className={`
                                     p-4 rounded-lg border
                                     ${isCurrent ? 'bg-base-200/50 border-primary/30' : 'border-base-200'}
@@ -865,7 +960,7 @@ function SessionsTab({ sessions, currentIp }: { sessions: any[], currentIp: stri
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     {!isCurrent && (
                                         <Form method="post">
                                             <input type="hidden" name="intent" value="logout-session" />
@@ -1023,7 +1118,7 @@ function BackupCodesTab({
                 </div>
             </div>
 
-            {/* History Card - Responsive Table */}
+            {/* History Card */}
             {stats.used > 0 && (
                 <div className="card bg-base-100 shadow">
                     <div className="card-body p-4 sm:p-6">
@@ -1080,8 +1175,8 @@ function BackupCodesTab({
                         {/* Mobile List */}
                         <div className="sm:hidden space-y-2">
                             {stats.codes.map((code, index) => (
-                                <div 
-                                    key={code.id} 
+                                <div
+                                    key={code.id}
                                     className={`
                                         flex items-center justify-between p-3 rounded-lg border border-base-200
                                         ${code.used ? 'opacity-60 bg-base-200/30' : ''}
@@ -1330,6 +1425,146 @@ function RegenerateModal({
                 </Form>
             </div>
             <div className="modal-backdrop" onClick={onClose}>
+                <button className="cursor-default">close</button>
+            </div>
+        </div>
+    );
+}
+
+function DeleteAccountModal({
+    onClose,
+    actionData,
+    isSubmitting,
+    userEmail
+}: {
+    onClose: () => void;
+    actionData: any;
+    isSubmitting: boolean;
+    userEmail: string;
+}) {
+    const [showPassword, setShowPassword] = useState(false);
+    const [confirmation, setConfirmation] = useState("");
+
+    const isConfirmationValid = confirmation === "ELIMINAR MI CUENTA";
+
+    return (
+        <div className="modal modal-open modal-bottom sm:modal-middle">
+            <div className="modal-box w-full sm:max-w-md">
+                <h3 className="font-bold text-lg sm:text-xl flex items-center gap-2 text-error">
+                    <AlertTriangle className="w-6 h-6" />
+                    Eliminar cuenta permanentemente
+                </h3>
+
+                <div className="py-4 space-y-4">
+                    <Alert
+                        type="error"
+                        message="Esta acción es irreversible. Se eliminarán permanentemente:"
+                        dismissible={false}
+                    />
+
+                    <ul className="list-disc list-inside text-sm text-base-content/70 space-y-1 ml-2">
+                        <li>Tu perfil y datos personales</li>
+                        <li>Todas tus sesiones activas</li>
+                        <li>Configuración de autenticación 2FA</li>
+                        <li>Códigos de respaldo</li>
+                        <li>Todo el historial asociado a tu cuenta</li>
+                    </ul>
+
+                    <div className="bg-base-200 rounded-lg p-3">
+                        <p className="text-xs text-base-content/60">
+                            Cuenta a eliminar: <strong className="text-base-content">{userEmail}</strong>
+                        </p>
+                    </div>
+
+                    <Alert
+                        type="error"
+                        message={actionData?.intent === 'delete-account' && actionData?.error
+                            ? actionData.error
+                            : null
+                        }
+                        dismissible
+                    />
+
+                    <Form method="post" className="space-y-4">
+                        <input type="hidden" name="intent" value="delete-account" />
+
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text text-sm">Tu contraseña</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    className="input input-bordered input-sm sm:input-md w-full pr-12"
+                                    placeholder="Ingresa tu contraseña"
+                                    required
+                                    autoComplete="current-password"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs sm:btn-sm btn-circle"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text text-sm">
+                                    Escribe <strong className="text-error">ELIMINAR MI CUENTA</strong> para confirmar
+                                </span>
+                            </label>
+                            <input
+                                name="confirmation"
+                                type="text"
+                                className={`input input-bordered input-sm sm:input-md w-full ${confirmation && !isConfirmationValid ? 'input-error' : ''
+                                    } ${isConfirmationValid ? 'input-success' : ''}`}
+                                placeholder="ELIMINAR MI CUENTA"
+                                value={confirmation}
+                                onChange={(e) => setConfirmation(e.target.value)}
+                                required
+                                autoComplete="off"
+                            />
+                            {confirmation && !isConfirmationValid && (
+                                <label className="label">
+                                    <span className="label-text-alt text-error text-xs">
+                                        Debes escribir exactamente "ELIMINAR MI CUENTA"
+                                    </span>
+                                </label>
+                            )}
+                        </div>
+
+                        <div className="modal-action flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="btn btn-ghost btn-sm sm:btn-md w-full sm:w-auto order-2 sm:order-1"
+                                disabled={isSubmitting}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !isConfirmationValid}
+                                className="btn btn-error btn-sm sm:btn-md gap-2 w-full sm:w-auto order-1 sm:order-2"
+                            >
+                                {isSubmitting ? (
+                                    <span className="loading loading-spinner loading-sm" />
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        Eliminar mi cuenta permanentemente
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </Form>
+                </div>
+            </div>
+            <div className="modal-backdrop bg-black/60" onClick={onClose}>
                 <button className="cursor-default">close</button>
             </div>
         </div>

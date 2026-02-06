@@ -36,7 +36,7 @@ export default function Home() {
                 className="btn btn-primary w-full shadow-lg"
                 aria-label="Volver a la página de registro"
               >
-                Volver al Registro
+                Volver al Inicio
               </Link>
             </div>
           </div>

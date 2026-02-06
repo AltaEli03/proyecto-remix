@@ -8,7 +8,8 @@ type SecurityAction =
     | 'mfa_enabled'
     | 'mfa_disabled'
     | 'email_verified'
-    | 'account_locked';
+    | 'account_locked'
+    | 'account_deleted';
 
 export async function logSecurityEvent(
     action: SecurityAction,

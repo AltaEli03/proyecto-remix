@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { Alert } from "~/components/Alert";
+import { Navbar } from "~/components/Navbar";
+import { getOptionalUser } from "~/utils/auth.guard";
 import {
     uploadImageToCloudinary,
     getImagesFromCloudinary,
@@ -51,14 +53,17 @@ export function meta({ }: Route.MetaArgs) {
     ];
 }
 
-// --- LOADER: Obtener imágenes existentes ---
+// --- LOADER: Obtener imágenes existentes + usuario ---
 export async function loader({ request }: LoaderFunctionArgs) {
+    // ✅ OBTENER USER
+    const user = await getOptionalUser(request);
+    
     try {
         const images = await getImagesFromCloudinary();
-        return data({ images, error: null });
+        return data({ user, images, error: null }); // ✅ INCLUIR USER
     } catch (error) {
         console.error("Error al cargar imágenes:", error);
-        return data({ images: [], error: "No se pudieron cargar las imágenes" });
+        return data({ user, images: [], error: "No se pudieron cargar las imágenes" }); // ✅ INCLUIR USER
     }
 }
 
@@ -114,7 +119,6 @@ export async function action({ request }: ActionFunctionArgs) {
         );
     }
 
-    // Validación de respaldo en el servidor (Seguridad)
     if (file.size > MAX_FILE_SIZE_BYTES) {
         return data(
             { success: false, error: `La imagen supera el límite de ${MAX_FILE_SIZE_MB}MB`, message: null },
@@ -140,7 +144,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // --- COMPONENTE PRINCIPAL ---
 export default function Galeria() {
-    const { images, error: loaderError } = useLoaderData<typeof loader>();
+    // ✅ OBTENER USER DEL LOADER
+    const { user, images, error: loaderError } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const navigation = useNavigation();
     const revalidator = useRevalidator();
@@ -152,28 +157,20 @@ export default function Galeria() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [modalImage, setModalImage] = useState<{ url: string; publicId: string } | null>(null);
     const [dragActive, setDragActive] = useState(false);
-
-    // Estado para el modal de confirmación de eliminación
     const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
-
-    // NUEVO: Estado para errores del cliente (validación inmediata)
     const [clientError, setClientError] = useState<string | null>(null);
-
-    // NUEVO: Estado para controlar qué imagen tiene el menú activo en móvil
     const [activeImageMenu, setActiveImageMenu] = useState<string | null>(null);
 
     const isSubmitting = navigation.state === "submitting";
     const isLoading = navigation.state === "loading" || revalidator.state === "loading";
     const isDeleting = isSubmitting && navigation.formData?.get("intent") === "delete";
 
-    // Limpiar preview después de subida exitosa
     useEffect(() => {
         if (actionData?.success && actionData?.message?.includes("subida")) {
             clearPreview();
         }
     }, [actionData]);
 
-    // Cerrar modal de confirmación después de eliminar exitosamente
     useEffect(() => {
         if (actionData?.success && actionData?.message?.includes("eliminada")) {
             setDeleteConfirmation(null);
@@ -181,7 +178,6 @@ export default function Galeria() {
         }
     }, [actionData]);
 
-    // Cerrar menú activo al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = () => {
             setActiveImageMenu(null);
@@ -193,14 +189,11 @@ export default function Galeria() {
         }
     }, [activeImageMenu]);
 
-    // NUEVO: Función centralizada de validación
     const validateAndSetFile = useCallback((file: File) => {
-        setClientError(null); // Limpiar errores previos
+        setClientError(null);
 
-        // 1. Validar Tipo
         if (!ALLOWED_FORMATS.includes(file.type)) {
             setClientError(`Formato de archivo no válido. Solo se permiten: JPG, PNG, GIF, WEBP.`);
-
             setSelectedFile(null);
             setPreview(null);
             if (fileInputRef.current) {
@@ -209,10 +202,8 @@ export default function Galeria() {
             return false;
         }
 
-        // 2. Validar Tamaño
         if (file.size > MAX_FILE_SIZE_BYTES) {
             setClientError(`La imagen es demasiado grande. Máximo permitido: ${MAX_FILE_SIZE_MB} MB.`);
-            // Aún así mostramos la preview para que el usuario vea qué archivo seleccionó
             setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -222,7 +213,6 @@ export default function Galeria() {
             return false;
         }
 
-        // Si pasa todas las validaciones
         setSelectedFile(file);
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -232,7 +222,6 @@ export default function Galeria() {
         return true;
     }, []);
 
-    // Manejar cambio de archivo (Input)
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -240,7 +229,6 @@ export default function Galeria() {
         }
     };
 
-    // Manejar drag & drop
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -260,7 +248,6 @@ export default function Galeria() {
         if (file) {
             const isValid = validateAndSetFile(file);
 
-            // Solo sincronizar input file si es válido
             if (isValid) {
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
@@ -271,47 +258,44 @@ export default function Galeria() {
         }
     }, [validateAndSetFile]);
 
-    // Limpiar selección
     const clearPreview = () => {
         setPreview(null);
         setSelectedFile(null);
-        setClientError(null); // Limpiar error al cancelar
+        setClientError(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
     };
 
-    // Abrir modal de confirmación de eliminación
     const openDeleteConfirmation = (publicId: string, imageUrl?: string) => {
         setDeleteConfirmation({ publicId, imageUrl });
-        setActiveImageMenu(null); // Cerrar menú al abrir confirmación
+        setActiveImageMenu(null);
     };
 
-    // Cerrar modal de confirmación
     const closeDeleteConfirmation = () => {
         setDeleteConfirmation(null);
     };
 
-    // Confirmar eliminación
     const confirmDelete = () => {
         if (deleteFormRef.current) {
             deleteFormRef.current.requestSubmit();
         }
     };
 
-    // Formatear tamaño de archivo
     const formatFileSize = (bytes: number) => {
         if (bytes < 1024) return bytes + " B";
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     };
 
-    // Verificar si el archivo excede el tamaño
     const isFileTooLarge = selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES;
 
     return (
         <main className="min-h-screen bg-base-200 p-4">
             <div className="container mx-auto max-w-6xl">
+                {/* ✅ AGREGAR NAVBAR */}
+                <Navbar user={user} currentPath="/galeria" />
+                
                 <Breadcrumb items={[{ label: "Galería" }]} />
 
                 <div className="grid gap-6 lg:grid-cols-3">
@@ -328,7 +312,6 @@ export default function Galeria() {
                                     Arrastra o selecciona una imagen (Máx {MAX_FILE_SIZE_MB}MB).
                                 </p>
 
-                                {/* Mensajes de Error (Cliente o Servidor) */}
                                 {(clientError || actionData?.error) && (
                                     <Alert
                                         type="error"
@@ -339,7 +322,6 @@ export default function Galeria() {
                                     />
                                 )}
 
-                                {/* Mensaje de Éxito */}
                                 {actionData?.success && !clientError && (
                                     <Alert
                                         type="success"
@@ -351,7 +333,6 @@ export default function Galeria() {
                                 )}
 
                                 <Form method="post" encType="multipart/form-data" className="space-y-4 mt-4">
-                                    {/* Zona de Drop */}
                                     <div
                                         onDragEnter={handleDrag}
                                         onDragLeave={handleDrag}
@@ -442,10 +423,8 @@ export default function Galeria() {
                                         />
                                     </div>
 
-                                    {/* Botón de Subir */}
                                     <button
                                         type="submit"
-                                        // Deshabilitar si hay error de cliente, no hay archivo, o se está enviando
                                         disabled={!selectedFile || !!clientError || isFileTooLarge || isSubmitting}
                                         className="btn btn-primary w-full gap-2"
                                         aria-disabled={!selectedFile || !!clientError || isFileTooLarge || isSubmitting}
@@ -464,7 +443,6 @@ export default function Galeria() {
                                     </button>
                                 </Form>
 
-                                {/* Info adicional */}
                                 <div className="divider text-xs text-base-content/50">Información</div>
                                 <ul className="text-xs text-base-content/60 space-y-1">
                                     <li>• Las imágenes se almacenan en Cloudinary</li>
@@ -502,7 +480,6 @@ export default function Galeria() {
                                     </button>
                                 </div>
 
-                                {/* Error del loader */}
                                 {loaderError && (
                                     <Alert
                                         type="warning"
@@ -512,7 +489,6 @@ export default function Galeria() {
                                     />
                                 )}
 
-                                {/* Estado vacío */}
                                 {images.length === 0 && !loaderError ? (
                                     <div className="text-center py-16">
                                         <div className="mx-auto w-20 h-20 rounded-full bg-base-200 flex items-center justify-center mb-4">
@@ -526,7 +502,6 @@ export default function Galeria() {
                                         </p>
                                     </div>
                                 ) : (
-                                    /* Grid de imágenes */
                                     <div
                                         className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4"
                                         role="list"
@@ -545,15 +520,11 @@ export default function Galeria() {
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                 />
 
-                                                {/* ===== OVERLAY MÓVIL - Siempre visible ===== */}
+                                                {/* OVERLAY MÓVIL */}
                                                 <div className="absolute inset-0 md:hidden">
-                                                    {/* Gradiente inferior sutil */}
                                                     <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
-
-                                                    {/* Botones siempre visibles en móvil */}
                                                     <div className="absolute bottom-0 left-0 right-0 p-2">
                                                         <div className="flex justify-center gap-1.5">
-                                                            {/* Ver en grande */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setModalImage({
@@ -565,8 +536,6 @@ export default function Galeria() {
                                                             >
                                                                 <ZoomIn className="w-5 h-5" />
                                                             </button>
-
-                                                            {/* Descargar */}
                                                             <a
                                                                 href={`${image.secure_url}?download=${image.public_id.split('/').pop() || 'imagen'}.${image.format}`}
                                                                 download
@@ -575,8 +544,6 @@ export default function Galeria() {
                                                             >
                                                                 <Download className="w-5 h-5" />
                                                             </a>
-
-                                                            {/* Eliminar */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => openDeleteConfirmation(image.public_id, image.secure_url)}
@@ -589,11 +556,10 @@ export default function Galeria() {
                                                     </div>
                                                 </div>
 
-                                                {/* ===== OVERLAY DESKTOP - Solo en hover ===== */}
+                                                {/* OVERLAY DESKTOP */}
                                                 <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                                     <div className="absolute bottom-0 left-0 right-0 p-3">
                                                         <div className="flex justify-center gap-2">
-                                                            {/* Ver en grande */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setModalImage({
@@ -605,8 +571,6 @@ export default function Galeria() {
                                                             >
                                                                 <ZoomIn className="w-4 h-4" />
                                                             </button>
-
-                                                            {/* Descargar */}
                                                             <a
                                                                 href={image.secure_url}
                                                                 download
@@ -617,8 +581,6 @@ export default function Galeria() {
                                                             >
                                                                 <Download className="w-4 h-4" />
                                                             </a>
-
-                                                            {/* Eliminar */}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => openDeleteConfirmation(image.public_id, image.secure_url)}
@@ -631,7 +593,6 @@ export default function Galeria() {
                                                     </div>
                                                 </div>
 
-                                                {/* Indicador de carga al eliminar */}
                                                 {navigation.formData?.get("publicId") === image.public_id && (
                                                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                                                         <span className="loading loading-spinner loading-lg text-white"></span>
@@ -646,7 +607,7 @@ export default function Galeria() {
                     </section>
                 </div>
 
-                {/* ===== MODAL DE VISTA PREVIA ===== */}
+                {/* MODAL DE VISTA PREVIA */}
                 {modalImage && (
                     <dialog
                         className="modal modal-open"
@@ -673,7 +634,6 @@ export default function Galeria() {
                                 />
                             </figure>
 
-                            {/* Acciones del modal */}
                             <div className="flex justify-center gap-3 mt-4 pb-2">
                                 <a
                                     href={modalImage.url}
@@ -702,7 +662,7 @@ export default function Galeria() {
                     </dialog>
                 )}
 
-                {/* ===== MODAL DE CONFIRMACIÓN DE ELIMINACIÓN ===== */}
+                {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
                 {deleteConfirmation && (
                     <dialog
                         className="modal modal-open"
@@ -714,14 +674,12 @@ export default function Galeria() {
                             className="modal-box max-w-md"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Icono de advertencia */}
                             <div className="flex justify-center mb-4">
                                 <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center">
                                     <AlertTriangle className="w-8 h-8 text-error" aria-hidden="true" />
                                 </div>
                             </div>
 
-                            {/* Título */}
                             <h3
                                 id="delete-modal-title"
                                 className="font-bold text-lg text-center"
@@ -729,7 +687,6 @@ export default function Galeria() {
                                 ¿Eliminar esta imagen?
                             </h3>
 
-                            {/* Descripción */}
                             <p
                                 id="delete-modal-description"
                                 className="py-4 text-center text-base-content/70"
@@ -737,7 +694,6 @@ export default function Galeria() {
                                 Esta acción no se puede deshacer. La imagen será eliminada permanentemente de la galería.
                             </p>
 
-                            {/* Vista previa de la imagen a eliminar */}
                             {deleteConfirmation.imageUrl && (
                                 <div className="flex justify-center mb-4">
                                     <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-error/30">
@@ -751,7 +707,6 @@ export default function Galeria() {
                                 </div>
                             )}
 
-                            {/* Formulario oculto para eliminar */}
                             <Form
                                 ref={deleteFormRef}
                                 method="post"
@@ -761,7 +716,6 @@ export default function Galeria() {
                                 <input type="hidden" name="publicId" value={deleteConfirmation.publicId} />
                             </Form>
 
-                            {/* Botones de acción */}
                             <div className="modal-action justify-center gap-3">
                                 <button
                                     type="button"
@@ -792,7 +746,6 @@ export default function Galeria() {
                             </div>
                         </div>
 
-                        {/* Backdrop */}
                         <form method="dialog" className="modal-backdrop bg-black/60">
                             <button onClick={closeDeleteConfirmation}>cerrar</button>
                         </form>

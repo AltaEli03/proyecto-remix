@@ -1,12 +1,13 @@
 // app/components/Alert.tsx
 import { useState, useEffect, useRef } from "react";
-import { AlertCircle, CheckCircle, AlertTriangle, Info, X } from "lucide-react";
+import { AlertCircle, CheckCircle, AlertTriangle, Info, X, type LucideIcon } from "lucide-react";
 
 type AlertType = "success" | "error" | "warning" | "info";
 
 interface AlertProps {
     type: AlertType;
     message: string | null | undefined;
+    icon?: LucideIcon;
     dismissible?: boolean;
     autoClose?: number;
     onClose?: () => void;
@@ -23,6 +24,7 @@ const alertConfig = {
 export function Alert({
     type,
     message,
+    icon,
     dismissible = true,
     autoClose = 0,
     onClose,
@@ -65,7 +67,8 @@ export function Alert({
 
     if (!message || (!isVisible && !isLeaving)) return null;
 
-    const { class: alertClass, Icon } = alertConfig[type];
+    const { class: alertClass, Icon: DefaultIcon } = alertConfig[type];
+    const Icon = icon || DefaultIcon;
 
     return (
         <div

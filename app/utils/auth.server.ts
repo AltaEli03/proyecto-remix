@@ -550,4 +550,38 @@ export async function registerUserAtomic(
 
         return { userId, verificationToken };
     });
+
+
+}
+
+// auth.server.ts - Añadir esta función
+
+export async function deleteUserAccount(userId: number): Promise<void> {
+    await transaction(async (conn: PoolConnection) => {
+        // Eliminar en orden correcto por las foreign keys
+
+        // 1. Eliminar refresh tokens
+        await conn.query('DELETE FROM refresh_tokens WHERE user_id = ?', [userId]);
+
+        // 2. Eliminar backup codes MFA
+        await conn.query('DELETE FROM mfa_backup_codes WHERE user_id = ?', [userId]);
+
+        // 3. Eliminar verificaciones de email
+        await conn.query('DELETE FROM email_verifications WHERE user_id = ?', [userId]);
+
+        // 4. Eliminar password resets
+        await conn.query('DELETE FROM password_resets WHERE user_id = ?', [userId]);
+
+        // 5. Anonimizar security logs (mantener para auditoría pero sin vincular al usuario)
+        await conn.query(
+            `UPDATE security_logs 
+             SET user_id = NULL, 
+                 details = JSON_SET(COALESCE(details, '{}'), '$.deleted_user_id', ?) 
+             WHERE user_id = ?`,
+            [userId, userId]
+        );
+
+        // 6. Finalmente eliminar el usuario
+        await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+    });
 }

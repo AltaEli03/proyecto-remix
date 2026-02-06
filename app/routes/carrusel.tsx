@@ -14,6 +14,8 @@ import {
   Clock
 } from "lucide-react";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { Navbar } from "~/components/Navbar";
+import { getOptionalUser } from "~/utils/auth.guard";
 import type { Route } from "./+types/carrusel";
 
 interface ImageData {
@@ -24,8 +26,8 @@ interface ImageData {
 }
 
 interface LoaderData {
+  user: any; // ✅ AGREGAR USER AL TIPO
   images: ImageData[];
-  // ✅ NUEVO: Información para demostrar el fetch
   fetchInfo: {
     apiUrl: string;
     timestamp: string;
@@ -33,7 +35,6 @@ interface LoaderData {
     page: number;
     method: string;
   };
-  // ✅ NUEVO: Datos crudos de la API
   rawData: Array<{
     id: string;
     author: string;
@@ -45,16 +46,13 @@ interface LoaderData {
 }
 
 export async function loader({ request }: Route.LoaderArgs): Promise<LoaderData> {
+  // ✅ OBTENER USER
+  const user = await getOptionalUser(request);
+
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page")) || Math.floor(Math.random() * 100) + 1;
 
-  // ✅ URL de la API que vamos a consultar
   const apiUrl = `https://picsum.photos/v2/list?page=${page}&limit=5`;
-
-  // ✅ Registrar el momento de la petición
-  const fetchStart = Date.now();
-
-  // ✅ FETCH API - La petición HTTP real
   const response = await fetch(apiUrl);
 
   if (!response.ok) {
@@ -79,8 +77,8 @@ export async function loader({ request }: Route.LoaderArgs): Promise<LoaderData>
     author: img.author,
   }));
 
-  // ✅ Retornar información adicional sobre el fetch
   return {
+    user, // ✅ RETORNAR USER
     images,
     rawData,
     fetchInfo: {
@@ -101,7 +99,8 @@ export function meta({ }: Route.MetaArgs) {
 }
 
 export default function Carrusel() {
-  const { images: initialImages, fetchInfo: initialFetchInfo, rawData: initialRawData } = useLoaderData<LoaderData>();
+  // ✅ OBTENER USER DEL LOADER
+  const { user, images: initialImages, fetchInfo: initialFetchInfo, rawData: initialRawData } = useLoaderData<LoaderData>();
   const fetcher = useFetcher<LoaderData>();
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [showRawData, setShowRawData] = useState<boolean>(false);
@@ -144,6 +143,9 @@ export default function Carrusel() {
   return (
     <main className="min-h-screen bg-base-200 p-4">
       <div className="container mx-auto max-w-4xl">
+        {/* ✅ AGREGAR NAVBAR */}
+        <Navbar user={user} currentPath="/carrusel" />
+
         <Breadcrumb items={[{ label: "Carrusel" }]} />
 
         {/* ✅ NUEVO: Panel de información de Fetch API */}

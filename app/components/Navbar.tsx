@@ -64,9 +64,7 @@ export function Navbar({ user, currentPath = "/" }: NavbarProps) {
     );
 }
 
-// ==========================================
 // Menús para usuarios NO autenticados
-// ==========================================
 
 function GuestMenu() {
     return (
@@ -102,9 +100,7 @@ function MobileGuestMenu() {
     );
 }
 
-// ==========================================
 // Menús para usuarios autenticados
-// ==========================================
 
 function AuthenticatedMenu({ user }: { user: NavbarUser }) {
     return (
