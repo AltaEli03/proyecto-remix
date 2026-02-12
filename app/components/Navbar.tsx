@@ -69,11 +69,11 @@ export function Navbar({ user, currentPath = "/" }: NavbarProps) {
 function GuestMenu() {
     return (
         <div className="flex items-center gap-2">
-            <Link to="/auth/login" className="btn btn-ghost gap-2">
+            <Link to="/auth/login" className="btn btn-primary gap-2">
                 <LogIn className="w-4 h-4" />
                 Iniciar Sesión
             </Link>
-            <Link to="/auth/register" className="btn btn-primary gap-2">
+            <Link to="/auth/register" className="btn btn-secondary gap-2">
                 <UserPlus className="w-4 h-4" />
                 Registrarse
             </Link>

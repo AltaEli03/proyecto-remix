@@ -348,7 +348,7 @@ export default function Login() {
             {step === 'login' && (
               <>
                 <div className="divider text-base-content/50">¿No tienes cuenta?</div>
-                <Link to="/auth/register" className="btn btn-outline w-full">
+                <Link to="/auth/register" className="btn btn btn-outline btn-secondary w-full">
                   Crear una cuenta
                 </Link>
               </>

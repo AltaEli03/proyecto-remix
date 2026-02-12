@@ -587,7 +587,7 @@ export default function CaptchaCrud() {
                                 <button
                                     type="button"
                                     onClick={() => setShowFilters(!showFilters)}
-                                    className={`btn btn-sm gap-2 ${showFilters ? 'btn-secondary' : 'btn-ghost'}`}
+                                    className={`btn btn-sm gap-2 ${showFilters ? 'btn-secondary' : 'btn-neutral'}`}
                                 >
                                     <Filter className="w-4 h-4" />
                                     Filtros
@@ -598,7 +598,7 @@ export default function CaptchaCrud() {
                                     <button
                                         type="button"
                                         onClick={handleClearFilters}
-                                        className="btn btn-ghost btn-sm gap-2"
+                                        className="btn btn-info btn-sm gap-2"
                                     >
                                         <RotateCcw className="w-4 h-4" />
                                         Limpiar
@@ -883,7 +883,7 @@ export default function CaptchaCrud() {
                                                                 <button
                                                                     type="button"
                                                                     onClick={handleClearSearch}
-                                                                    className="btn btn-ghost btn-sm gap-1"
+                                                                    className="btn btn-info btn-sm gap-1"
                                                                 >
                                                                     <X className="w-4 h-4" />
                                                                     Limpiar búsqueda
@@ -893,7 +893,7 @@ export default function CaptchaCrud() {
                                                                 <button
                                                                     type="button"
                                                                     onClick={handleClearFilters}
-                                                                    className="btn btn-ghost btn-sm gap-1"
+                                                                    className="btn btn-neutral btn-sm gap-1"
                                                                 >
                                                                     <RotateCcw className="w-4 h-4" />
                                                                     Limpiar filtros
@@ -951,7 +951,7 @@ export default function CaptchaCrud() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setEditingRecord(record)}
-                                                            className="btn btn-ghost btn-xs gap-1"
+                                                            className="btn btn-warning btn-xs gap-1"
                                                             aria-label={`Editar ${record.nombre}`}
                                                         >
                                                             <Pencil className="w-3 h-3" />
@@ -960,7 +960,7 @@ export default function CaptchaCrud() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeleteRecord(record)}
-                                                            className="btn btn-ghost btn-xs text-error gap-1"
+                                                            className="btn btn-error btn-xs gap-1"
                                                             aria-label={`Eliminar ${record.nombre}`}
                                                         >
                                                             <Trash2 className="w-3 h-3" />
@@ -1063,7 +1063,7 @@ export default function CaptchaCrud() {
                         <div className="modal-action">
                             <button
                                 type="button"
-                                className="btn btn-ghost"
+                                className="btn btn-error"
                                 onClick={() => setIsCreateModalOpen(false)}
                             >
                                 Cancelar
@@ -1123,7 +1123,7 @@ export default function CaptchaCrud() {
                         <div className="modal-action">
                             <button
                                 type="button"
-                                className="btn btn-ghost"
+                                className="btn btn-error"
                                 onClick={() => setEditingRecord(null)}
                             >
                                 Cancelar
@@ -1174,7 +1174,7 @@ export default function CaptchaCrud() {
                         <div className="modal-action">
                             <button
                                 type="button"
-                                className="btn btn-ghost"
+                                className="btn btn-warning"
                                 onClick={() => setDeleteRecord(null)}
                             >
                                 Cancelar
@@ -1225,7 +1225,7 @@ export default function CaptchaCrud() {
                         <div className="modal-action">
                             <button
                                 type="button"
-                                className="btn btn-ghost"
+                                className="btn btn-warning"
                                 onClick={() => setShowDeleteMultipleModal(false)}
                             >
                                 Cancelar

@@ -386,7 +386,7 @@ export default function Register() {
               <button
                 type="submit"
                 disabled={isSubmitting || !isFormValid}
-                className="btn btn-primary w-full gap-2"
+                className="btn btn-secondary w-full gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -404,7 +404,7 @@ export default function Register() {
 
             <div className="divider text-base-content/50">¿Ya tienes cuenta?</div>
 
-            <Link to="/auth/login" className="btn btn-outline w-full">
+            <Link to="/auth/login" className="btn btn-outline btn-primary w-full">
               Iniciar Sesión
             </Link>
 
