@@ -8,6 +8,9 @@ export interface SessionData {
     refreshToken: string;
     csrfToken: string;
     auth_pending_user_id: number;
+    backup_password_verified: boolean;
+    backup_password_verified_at: number;
+    newly_generated_codes: string[];
 }
 
 export interface SessionFlashData {

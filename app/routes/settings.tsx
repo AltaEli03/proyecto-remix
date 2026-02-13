@@ -382,67 +382,47 @@ export default function SettingsPage() {
 
     return (
         <main className="min-h-screen bg-base-200 safe-area-inset">
-            {/* ✅ NAVBAR GLOBAL */}
-            <div className="container mx-auto max-w-6xl px-2 sm:px-4 pt-4">
-                <Navbar user={user} currentPath="/settings" />
+            {/* ✅ Navbar global */}
+            <div className="sticky top-0 z-50">
+                <div className="container mx-auto max-w-6xl px-2 sm:px-4 pt-4">
+                    <Navbar user={user} currentPath="/settings" />
+                </div>
             </div>
 
-            {/* Header de configuración con tabs */}
-            <header className="sticky top-0 z-40 bg-base-100 shadow-sm safe-area-top mt-4">
-                <div className="navbar container mx-auto max-w-6xl px-2 sm:px-4">
-                    <div className="flex-none">
-                        <Link
-                            to="/dashboard"
-                            className="btn btn-ghost btn-sm sm:btn-md gap-1 sm:gap-2"
-                        >
-                            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="hidden sm:inline">Volver</span>
-                        </Link>
-                    </div>
-                    <div className="flex-1 px-2">
-                        <h1 className="text-lg sm:text-xl font-bold truncate">Configuración</h1>
-                    </div>
-
-                    <div className="flex-none lg:hidden">
-                        <button
-                            className="btn btn-ghost btn-square"
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            aria-label="Menú"
-                        >
-                            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tabs horizontales deslizables */}
-                <div className="lg:hidden border-t border-base-200">
-                    <div
-                        ref={tabsContainerRef}
-                        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                        {visibleTabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                data-tab={tab.id}
-                                onClick={() => handleTabChange(tab.id)}
-                                className={`
-                                    flex items-center gap-2 px-4 py-3 whitespace-nowrap snap-center
-                                    border-b-2 transition-colors min-w-max
-                                    ${activeTab === tab.id
-                                        ? 'border-primary text-primary font-medium'
-                                        : 'border-transparent text-base-content/60 hover:text-base-content'
-                                    }
-                                `}
+            <div className="sticky top-[72px] z-40 bg-base-200">
+                <div className="container mx-auto max-w-6xl px-2 sm:px-4">
+                    <div className="bg-base-100 rounded-b-box shadow-sm">
+                        {/* Tabs horizontales para móvil */}
+                        <div className="lg:hidden">
+                            <div
+                                ref={tabsContainerRef}
+                                className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+                                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                             >
-                                {tab.icon}
-                                <span className="text-sm">{tab.label}</span>
-                                {tab.badge}
-                            </button>
-                        ))}
+                                {visibleTabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        data-tab={tab.id}
+                                        onClick={() => handleTabChange(tab.id)}
+                                        className={`
+                                            flex items-center gap-2 px-4 py-3 whitespace-nowrap snap-center
+                                            border-b-2 transition-colors min-w-max
+                                            ${activeTab === tab.id
+                                                ? 'border-primary text-primary font-medium'
+                                                : 'border-transparent text-base-content/60 hover:text-base-content'
+                                            }
+                                        `}
+                                    >
+                                        {tab.icon}
+                                        <span className="text-sm">{tab.label}</span>
+                                        {tab.badge}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </header>
+            </div>
 
             {/* Overlay del menú móvil */}
             {isMobileMenuOpen && (
@@ -551,6 +531,9 @@ export default function SettingsPage() {
         </main>
     );
 }
+
+
+
 
 function ProfileTab({ user, actionData, isSubmitting }: {
     user: any;
