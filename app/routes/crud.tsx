@@ -52,7 +52,7 @@ interface ActionResponse {
 }
 
 // Tipos para ordenamiento
-type SortField = 'id' | 'nombre' | 'fecha_registro';
+type SortField = 'nombre' | 'fecha_registro';
 type SortDirection = 'asc' | 'desc' | null;
 
 // ⭐ Custom Hook para Debounce
@@ -397,15 +397,9 @@ export default function CaptchaCrud() {
                 if (bVal === null || bVal === undefined) bVal = '';
 
                 // Convertir según el tipo de campo
-                if (sortField === 'id') {
-                    aVal = Number(aVal) || 0;
-                    bVal = Number(bVal) || 0;
-                } else if (sortField === 'fecha_registro') {
-                    // Usar timestamp para ordenar fechas
+                if (sortField === 'fecha_registro') {
                     aVal = aVal ? new Date(aVal).getTime() : 0;
                     bVal = bVal ? new Date(bVal).getTime() : 0;
-
-                    // Verificar fechas válidas
                     if (isNaN(aVal)) aVal = 0;
                     if (isNaN(bVal)) bVal = 0;
                 } else {
@@ -686,7 +680,6 @@ export default function CaptchaCrud() {
                                                 className="select select-bordered select-sm"
                                             >
                                                 <option value="">Sin ordenar</option>
-                                                <option value="id">ID</option>
                                                 <option value="nombre">Nombre</option>
                                                 <option value="fecha_registro">Fecha Registro</option>
                                             </select>
@@ -702,7 +695,7 @@ export default function CaptchaCrud() {
                                                 onChange={(e) => {
                                                     const value = e.target.value as SortDirection;
                                                     setSortDirection(value);
-                                                    if (value && !sortField) setSortField('id');
+                                                    if (value && !sortField) setSortField('nombre');
                                                 }}
                                                 disabled={!sortField}
                                                 className="select select-bordered select-sm"
@@ -831,16 +824,6 @@ export default function CaptchaCrud() {
                                                 />
                                             </label>
                                         </th>
-                                        {/* Header ID - Clickeable */}
-                                        <th
-                                            className="cursor-pointer select-none hover:bg-base-200 transition-colors"
-                                            onClick={() => handleSort('id')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                ID
-                                                {getSortIcon('id')}
-                                            </div>
-                                        </th>
                                         {/* Header Nombre - Clickeable */}
                                         <th
                                             className="cursor-pointer select-none hover:bg-base-200 transition-colors"
@@ -867,7 +850,7 @@ export default function CaptchaCrud() {
                                 <tbody>
                                     {processedRecords.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="text-center py-8">
+                                            <td colSpan={4} className="text-center py-8">
                                                 <div className="flex flex-col items-center gap-2 text-base-content/60">
                                                     <Database className="w-12 h-12 opacity-50" />
                                                     <p>No hay registros</p>
@@ -923,11 +906,6 @@ export default function CaptchaCrud() {
                                                         />
                                                     </label>
                                                 </th>
-                                                <td>
-                                                    <span className="badge badge-ghost badge-sm font-mono">
-                                                        #{record.id}
-                                                    </span>
-                                                </td>
                                                 <td>
                                                     {/* ⭐ Resaltar texto de búsqueda */}
                                                     <div className="font-medium">
